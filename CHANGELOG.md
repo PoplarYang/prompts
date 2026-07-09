@@ -1,5 +1,9 @@
 # Changelog
 
+## Desktop 0.1.2
+
+- Fixed Windows release build by compiling macOS Dock reopen handling only on macOS.
+
 ## Desktop 0.1.1
 
 - Added enhanced search across title, description, tags, aliases, path, and body.
