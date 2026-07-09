@@ -1,5 +1,22 @@
 # Changelog
 
+## Desktop 0.1.1
+
+- Added enhanced search across title, description, tags, aliases, path, and body.
+- Added fuzzy matching, `#tag`, `fav:`, and `recent:` search filters.
+- Added search highlighting in result titles, descriptions, tags, Markdown body, lists, and code blocks.
+- Added smart, relevance, recent, favorites, and most-used list modes.
+- Added favorite pinning, recent usage, and usage-count display.
+- Added theme setting for system, dark, and light modes.
+- Added language setting for system, Chinese, and English UI.
+- Added always-on-top setting and click-outside-to-hide behavior when disabled.
+- Improved global shortcut behavior so it can wake and hide the launcher.
+- Improved copy feedback and hides the launcher after copying.
+- Improved settings layout for smaller windows.
+- Fixed selection stability when toggling favorites.
+- Fixed macOS Dock/app icon reopen behavior.
+- Bumped desktop package version to `0.1.1`.
+
 ## 1.0.2
 
 - Added configurable wake shortcut setting to the static settings model.

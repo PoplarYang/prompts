@@ -2,6 +2,8 @@
 
 Tauri 2 + React + TypeScript desktop app for `pp`.
 
+Current desktop version: `0.1.1`.
+
 ## Development
 
 ```sh
@@ -22,23 +24,48 @@ Verified macOS output:
 src-tauri/target/release/bundle/macos/pp.app
 ```
 
+Create local macOS distribution artifacts from the repository root:
+
+```sh
+python3 scripts/package_desktop.py
+python3 scripts/verify_desktop_package.py
+```
+
+Outputs:
+
+```txt
+dist/pp-desktop-macos-aarch64.zip
+dist/pp-desktop-macos-aarch64.dmg
+```
+
 ## Implemented
 
 - Prompt launcher UI
-- Search and ranking
-- Markdown preview
+- Search and ranking across prompt metadata, path, and body
+- Fuzzy search plus `#tag`, `fav:`, and `recent:` filters
+- Search highlighting in result metadata and Markdown body content
+- Markdown preview with code blocks
+- Smart, relevance, recent, favorites, and most-used list modes
+- Favorite pinning, recent usage, and usage-count display
 - GitHub sync with jsDelivr fallback
 - Settings with configurable wake shortcut
+- Theme setting for system, dark, and light modes
+- Language setting for system, Chinese, and English
+- Always-on-top setting
+- Copy feedback and hide-after-copy behavior
 - Tauri clipboard manager plugin
 - Tauri global shortcut plugin
+- macOS Dock/app icon reopen behavior
 
-## Still Pending
+## Release
 
-- Manual packaged-app smoke test
-- Windows packaging
-- DMG issue investigation
+The GitHub release workflow builds:
 
-This template should help get you started developing with Tauri, React and Typescript in Vite.
+- static zip package
+- macOS `.zip` and `.dmg`
+- Windows NSIS installer
+
+GitHub releases are created as drafts so the generated artifacts can be checked before publishing.
 
 ## Recommended IDE Setup
 

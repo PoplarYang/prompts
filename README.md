@@ -12,17 +12,22 @@ https://github.com/PoplarYang/prompts
 
 ## Features
 
-- Search by title, description, tags, aliases, category, path, and body.
+- Search by title, description, tags, aliases, path, and body.
+- Fuzzy search plus `#tag`, `fav:`, and `recent:` filters.
+- Highlight search matches in result metadata and Markdown body content.
 - Preview Markdown prompt content with code blocks.
 - Copy prompt body to the clipboard.
 - Manual copy fallback when browser clipboard access is blocked.
-- Favorites, usage count, and recent usage stored locally.
+- Favorites, favorite pinning, usage count, and recent usage stored locally.
+- Smart, relevance, recent, favorites, and most-used desktop list modes.
 - Public GitHub repository sync.
 - jsDelivr fallback when GitHub tree API is unavailable or rate-limited.
 - Offline cache using browser storage.
 - Settings for repository URL, branch, prompt directory, and sync-on-launch.
 - Custom wake shortcut in the desktop app.
+- Always-on-top setting with click-outside-to-hide behavior when disabled.
 - Desktop theme setting for system, dark, and light modes.
+- Desktop language setting for system, Chinese, and English.
 - Desktop copy success feedback with a short visual affordance.
 - Human-readable Markdown + YAML prompt repository format.
 
@@ -179,7 +184,7 @@ The same sample content is also available under [demo-repo-content](demo-repo-co
 
 ## Status
 
-`pp` v1.0 is a static open-source release. The Tauri 2 desktop track has started under [desktop](desktop): the React UI has been ported, OS clipboard/global shortcut plugins are wired, macOS `.app`, `.zip`, and `.dmg` packaging have been verified locally, and Windows packaging is configured through GitHub Actions.
+`pp` includes the original static open-source app and the Tauri 2 desktop app. Desktop `0.1.1` has been verified locally on macOS, with Windows packaging configured through GitHub Actions. Current desktop artifacts are unsigned and not notarized.
 
 ## License
 

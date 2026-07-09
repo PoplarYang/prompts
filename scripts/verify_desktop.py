@@ -54,9 +54,22 @@ def main() -> int:
         if dependency not in cargo:
             return fail(f"Missing desktop Rust dependency: {dependency}")
 
+    lib = (DESKTOP / "src-tauri/src/lib.rs").read_text(encoding="utf-8")
+    for snippet in [
+        "tauri::RunEvent::Reopen",
+        "get_webview_window(\"main\")",
+        "window.show()",
+        "window.set_focus()",
+    ]:
+        if snippet not in lib:
+            return fail(f"Missing desktop reopen behavior: {snippet}")
+
     capabilities = (DESKTOP / "src-tauri/capabilities/default.json").read_text(encoding="utf-8")
     for permission in [
+        "core:window:allow-hide",
+        "core:window:allow-is-visible",
         "core:window:allow-set-focus",
+        "core:window:allow-set-always-on-top",
         "core:window:allow-show",
         "core:window:allow-unminimize",
         "global-shortcut:default",
@@ -78,7 +91,26 @@ def main() -> int:
         "Wake shortcut triggered",
         "searchInputRef.current?.focus()",
         "themeMode",
+        "languageMode",
+        "resolveLanguage",
+        "selectedPromptId",
+        "listMode",
+        "pinFavorites",
+        "parseSearchQuery",
+        "levenshteinDistance",
+        "fuzzyIncludes",
+        "getHighlightCandidates",
+        "highlightText",
+        "highlightEscapedHtml",
+        "renderMarkdown(selectedPrompt.body, search)",
+        "buildSections",
+        "alwaysOnTop",
+        "setAlwaysOnTop",
+        "onFocusChanged",
+        "window.addEventListener(\"blur\"",
+        "settingsOpenRef.current",
         "copy-spark",
+        "hideLauncher",
         "syncPrompts",
         "https://data.jsdelivr.com/v1/package/gh/",
     ]
@@ -102,6 +134,11 @@ def main() -> int:
         "--code-text",
         "backdrop-filter",
         "z-index: 30",
+        ".topbar .icon-button",
+        ".search-icon",
+        ".mode-tabs",
+        ".result-section-title",
+        "mark",
     ]:
         if snippet not in css:
             return fail(f"Missing desktop CSS behavior: {snippet}")

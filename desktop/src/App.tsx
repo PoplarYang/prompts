@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { isRegistered, register, unregister } from "@tauri-apps/plugin-global-shortcut";
 import { getCurrentWindow } from "@tauri-apps/api/window";
@@ -37,6 +37,10 @@ type AppConfig = {
   syncOnLaunch: boolean;
   wakeShortcut: string;
   themeMode: "system" | "dark" | "light";
+  languageMode: "system" | "zh-CN" | "en-US";
+  alwaysOnTop: boolean;
+  listMode: "smart" | "relevance" | "recent" | "favorites" | "used";
+  pinFavorites: boolean;
 };
 
 type PromptState = {
@@ -49,6 +53,26 @@ type LocalState = {
   prompts: Record<string, PromptState>;
 };
 
+type SearchQuery = {
+  raw: string;
+  terms: string[];
+  tags: string[];
+  favoriteOnly: boolean;
+  recentOnly: boolean;
+};
+
+type ScoredPrompt = {
+  prompt: Prompt;
+  local: PromptState;
+  score: number;
+};
+
+type PromptSection = {
+  id: string;
+  label: string;
+  prompts: Prompt[];
+};
+
 const defaultConfig: AppConfig = {
   repoUrl: "https://github.com/PoplarYang/prompts",
   branch: "main",
@@ -56,7 +80,107 @@ const defaultConfig: AppConfig = {
   syncOnLaunch: false,
   wakeShortcut: "CommandOrControl+Shift+P",
   themeMode: "system",
+  languageMode: "system",
+  alwaysOnTop: true,
+  listMode: "smart",
+  pinFavorites: true,
 };
+
+const messages = {
+  "en-US": {
+    alwaysOnTop: "Always on top",
+    allPrompts: "All prompts",
+    branch: "Branch",
+    clear: "Clear",
+    clipboardBlocked: "Clipboard blocked; prompt text selected",
+    copy: "Copy",
+    copyPrompt: "Copy prompt",
+    copied: "Copied",
+    dark: "Dark",
+    favorite: "Favorite",
+    followSystem: "Follow system",
+    language: "Language",
+    light: "Light",
+    listMode: "Default list",
+    manualCopyHint: "Clipboard access was blocked. The prompt text is selected below.",
+    matched: "matched",
+    mostUsed: "Most used",
+    navigate: "Navigate",
+    noPromptSelected: "No prompt selected",
+    pinFavorites: "Pin favorites",
+    prompts: "prompts",
+    promptsDirectory: "Prompts directory",
+    ready: "Ready",
+    recent: "Recent",
+    repositoryUrl: "Repository URL",
+    reset: "Reset",
+    save: "Save",
+    settings: "Settings",
+    settingsSaved: "Settings saved",
+    settingsSubtitle: "Sync prompts from a public GitHub repository.",
+    showFavorites: "Favorites",
+    showRecent: "Recent",
+    showRelevance: "Relevance",
+    showSmart: "Smart",
+    showUsed: "Used",
+    source: "Source",
+    sync: "Sync",
+    syncNow: "Sync now",
+    syncOnLaunch: "Sync on launch",
+    syncing: "Syncing GitHub repository...",
+    theme: "Theme",
+    wakeShortcut: "Wake shortcut",
+  },
+  "zh-CN": {
+    alwaysOnTop: "总在最前",
+    allPrompts: "全部",
+    branch: "分支",
+    clear: "清空",
+    clipboardBlocked: "剪贴板不可用；请手动复制选中的提示词",
+    copy: "复制",
+    copyPrompt: "复制提示词",
+    copied: "已复制",
+    dark: "深色",
+    favorite: "收藏",
+    followSystem: "跟随系统",
+    language: "语言",
+    light: "浅色",
+    listMode: "默认列表",
+    manualCopyHint: "剪贴板访问被阻止。下面的提示词文本已选中。",
+    matched: "匹配",
+    mostUsed: "常用",
+    navigate: "导航",
+    noPromptSelected: "未选择提示词",
+    pinFavorites: "收藏置顶",
+    prompts: "条提示词",
+    promptsDirectory: "提示词目录",
+    ready: "就绪",
+    recent: "最近",
+    repositoryUrl: "仓库地址",
+    reset: "重置",
+    save: "保存",
+    settings: "设置",
+    settingsSaved: "设置已保存",
+    settingsSubtitle: "从公开 GitHub 仓库同步提示词。",
+    showFavorites: "收藏",
+    showRecent: "最近",
+    showRelevance: "相关",
+    showSmart: "智能",
+    showUsed: "常用",
+    source: "来源",
+    sync: "同步",
+    syncNow: "立即同步",
+    syncOnLaunch: "启动时同步",
+    syncing: "正在同步 GitHub 仓库...",
+    theme: "主题",
+    wakeShortcut: "唤醒快捷键",
+  },
+} as const;
+
+function resolveLanguage(languageMode: AppConfig["languageMode"]) {
+  if (languageMode !== "system") return languageMode;
+  return navigator.language.toLowerCase().startsWith("zh") ? "zh-CN" : "en-US";
+}
 
 const fallbackIndex: PromptIndex = {
   library: {
@@ -147,33 +271,199 @@ function getPromptState(state: LocalState, id: string): PromptState {
   return state.prompts[id] ?? { favorite: false, useCount: 0, lastUsedAt: null };
 }
 
-function scorePrompt(prompt: Prompt, query: string, local: PromptState): number {
-  const q = normalize(query.trim());
-  let score = 0;
+function parseSearchQuery(raw: string): SearchQuery {
+  const terms: string[] = [];
+  const tags: string[] = [];
+  let favoriteOnly = false;
+  let recentOnly = false;
 
-  if (!q) {
-    if (local.favorite) score += 140;
-    if (local.lastUsedAt) score += 100;
-    score += Math.min(local.useCount, 20) * 3;
-    return score;
+  raw
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .forEach((token) => {
+      const lower = normalize(token);
+      if (lower.startsWith("#") && lower.length > 1) {
+        tags.push(lower.slice(1));
+        return;
+      }
+      if (["fav:", "favorite:", "favorites:", "f:"].includes(lower)) {
+        favoriteOnly = true;
+        return;
+      }
+      if (["recent:", "r:"].includes(lower)) {
+        recentOnly = true;
+        return;
+      }
+      terms.push(lower);
+    });
+
+  return { raw, terms, tags, favoriteOnly, recentOnly };
+}
+
+function levenshteinDistance(a: string, b: string): number {
+  if (Math.abs(a.length - b.length) > 2) return 3;
+  const previous = Array.from({ length: b.length + 1 }, (_, index) => index);
+  const current = Array.from({ length: b.length + 1 }, () => 0);
+
+  for (let i = 1; i <= a.length; i += 1) {
+    current[0] = i;
+    for (let j = 1; j <= b.length; j += 1) {
+      current[j] = Math.min(
+        previous[j] + 1,
+        current[j - 1] + 1,
+        previous[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1),
+      );
+    }
+    previous.splice(0, previous.length, ...current);
   }
 
-  const title = normalize(prompt.title);
-  const aliases = normalize(prompt.aliases.join(" "));
+  return previous[b.length];
+}
 
-  if (title === q) score += 300;
-  if (prompt.aliases.some((alias) => normalize(alias) === q)) score += 260;
-  if (title.includes(q)) score += 180;
-  if (aliases.includes(q)) score += 160;
-  if (normalize(prompt.tags.join(" ")).includes(q)) score += 130;
-  if (normalize(prompt.category).includes(q)) score += 110;
-  if (normalize(prompt.description).includes(q)) score += 90;
-  if (normalize(prompt.path).includes(q)) score += 60;
-  if (normalize(prompt.body).includes(q)) score += 35;
+function fuzzyIncludes(value: string, term: string): boolean {
+  const normalized = normalize(value);
+  if (!term) return true;
+  if (normalized.includes(term)) return true;
+  if (term.length < 3) return false;
+
+  return normalized
+    .split(/[^a-z0-9\u4e00-\u9fff]+/i)
+    .filter(Boolean)
+    .some((word) => {
+      if (word.includes(term) || term.includes(word)) return true;
+      const limit = term.length >= 5 ? 2 : 1;
+      return levenshteinDistance(word, term) <= limit;
+    });
+}
+
+function scoreField(value: string, term: string, exact: number, partial: number, fuzzy: number): number {
+  const normalized = normalize(value);
+  if (normalized === term) return exact;
+  if (normalized.includes(term)) return partial;
+  return fuzzyIncludes(normalized, term) ? fuzzy : 0;
+}
+
+function scorePrompt(prompt: Prompt, search: SearchQuery, local: PromptState): number {
+  if (search.favoriteOnly && !local.favorite) return 0;
+  if (search.recentOnly && !local.lastUsedAt) return 0;
+  if (search.tags.some((tag) => !prompt.tags.some((promptTag) => normalize(promptTag) === tag || normalize(promptTag).includes(tag)))) return 0;
+
+  if (!search.terms.length) return 1;
+
+  let score = 0;
+  for (const term of search.terms) {
+    const termScore =
+      scoreField(prompt.title, term, 320, 210, 140) ||
+      Math.max(...prompt.aliases.map((alias) => scoreField(alias, term, 280, 190, 120)), 0) ||
+      scoreField(prompt.tags.join(" "), term, 180, 150, 80) ||
+      scoreField(prompt.description, term, 120, 95, 55) ||
+      scoreField(prompt.path, term, 90, 70, 35) ||
+      scoreField(prompt.body, term, 55, 35, 15);
+    if (!termScore) return 0;
+    score += termScore;
+  }
+
   if (local.favorite) score += 16;
   if (local.lastUsedAt) score += 10;
   score += Math.min(local.useCount, 8);
   return score;
+}
+
+function lastUsedTime(local: PromptState): number {
+  return local.lastUsedAt ? new Date(local.lastUsedAt).getTime() || 0 : 0;
+}
+
+function compareByUsage(a: ScoredPrompt, b: ScoredPrompt): number {
+  return b.local.useCount - a.local.useCount || lastUsedTime(b.local) - lastUsedTime(a.local) || a.prompt.title.localeCompare(b.prompt.title);
+}
+
+function comparePrompts(mode: AppConfig["listMode"], pinFavorites: boolean) {
+  return (a: ScoredPrompt, b: ScoredPrompt) => {
+    if (pinFavorites && a.local.favorite !== b.local.favorite) return a.local.favorite ? -1 : 1;
+    if (mode === "recent") return lastUsedTime(b.local) - lastUsedTime(a.local) || b.score - a.score || a.prompt.title.localeCompare(b.prompt.title);
+    if (mode === "favorites") return Number(b.local.favorite) - Number(a.local.favorite) || b.score - a.score || a.prompt.title.localeCompare(b.prompt.title);
+    if (mode === "used") return compareByUsage(a, b);
+    return b.score - a.score || lastUsedTime(b.local) - lastUsedTime(a.local) || a.prompt.title.localeCompare(b.prompt.title);
+  };
+}
+
+function uniqueById(prompts: ScoredPrompt[]): ScoredPrompt[] {
+  const seen = new Set<string>();
+  return prompts.filter(({ prompt }) => {
+    if (seen.has(prompt.id)) return false;
+    seen.add(prompt.id);
+    return true;
+  });
+}
+
+function buildSections(scored: ScoredPrompt[], search: SearchQuery, config: AppConfig, labels: Record<keyof typeof messages["en-US"], string>): PromptSection[] {
+  const hasQuery = search.terms.length || search.tags.length || search.favoriteOnly || search.recentOnly;
+  const mode = hasQuery ? "relevance" : config.listMode;
+  const sorted = [...scored].sort(comparePrompts(mode, config.pinFavorites));
+
+  if (mode === "favorites") return [{ id: "favorites", label: labels.showFavorites, prompts: sorted.filter(({ local }) => local.favorite).map(({ prompt }) => prompt) }];
+  if (mode === "recent") return [{ id: "recent", label: labels.showRecent, prompts: sorted.filter(({ local }) => local.lastUsedAt).slice(0, 10).map(({ prompt }) => prompt) }];
+  if (mode === "used") return [{ id: "used", label: labels.showUsed, prompts: sorted.filter(({ local }) => local.useCount > 0).slice(0, 10).map(({ prompt }) => prompt) }];
+  if (mode === "relevance" || hasQuery) return [{ id: "relevance", label: hasQuery ? labels.matched : labels.showRelevance, prompts: sorted.map(({ prompt }) => prompt) }];
+
+  const favorites = sorted.filter(({ local }) => local.favorite);
+  const recent = [...scored].filter(({ local }) => local.lastUsedAt).sort(comparePrompts("recent", false)).slice(0, 10);
+  const used = [...scored].filter(({ local }) => local.useCount > 0).sort(comparePrompts("used", false)).slice(0, 10);
+  const consumed = new Set([...favorites, ...recent, ...used].map(({ prompt }) => prompt.id));
+  const rest = sorted.filter(({ prompt }) => !consumed.has(prompt.id));
+
+  return [
+    { id: "favorites", label: labels.showFavorites, prompts: favorites.map(({ prompt }) => prompt) },
+    { id: "recent", label: labels.showRecent, prompts: recent.filter(({ prompt }) => !favorites.some((item) => item.prompt.id === prompt.id)).map(({ prompt }) => prompt) },
+    { id: "used", label: labels.showUsed, prompts: used.filter(({ prompt }) => !favorites.some((item) => item.prompt.id === prompt.id) && !recent.some((item) => item.prompt.id === prompt.id)).map(({ prompt }) => prompt) },
+    { id: "all", label: labels.allPrompts, prompts: rest.map(({ prompt }) => prompt) },
+  ].filter((section) => section.prompts.length);
+}
+
+function getHighlightCandidates(value: string, search: SearchQuery): string[] {
+  const terms = [...search.terms, ...search.tags].filter(Boolean);
+  if (!terms.length) return [];
+
+  const candidates = new Set(terms);
+  const words = value.match(/[a-z0-9\u4e00-\u9fff]+/gi) ?? [];
+  words.forEach((word) => {
+    const normalizedWord = normalize(word);
+    terms.forEach((term) => {
+      if (normalizedWord === term || normalizedWord.includes(term)) {
+        return;
+      }
+      if (term.includes(normalizedWord)) {
+        candidates.add(word);
+        return;
+      }
+      if (term.length >= 3 && fuzzyIncludes(normalizedWord, term)) {
+        candidates.add(word);
+      }
+    });
+  });
+
+  return [...candidates].sort((a, b) => b.length - a.length);
+}
+
+function highlightText(value: string, search: SearchQuery) {
+  const candidates = getHighlightCandidates(value, search);
+  if (!candidates.length) return value;
+  const escaped = candidates.map((term) => term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+  const matcher = new RegExp(`(${escaped.join("|")})`, "ig");
+  return value.split(matcher).map((part, index) => {
+    const isMatch = candidates.some((candidate) => normalize(part) === normalize(candidate));
+    return isMatch ? <mark key={`${part}-${index}`}>{part}</mark> : part;
+  });
+}
+
+function highlightEscapedHtml(value: string, search: SearchQuery): string {
+  const candidates = getHighlightCandidates(value, search);
+  if (!candidates.length) return value;
+
+  const escaped = candidates.map((term) => escapeHtml(term).replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+  const matcher = new RegExp(`(${escaped.join("|")})`, "ig");
+  return value.replace(matcher, "<mark>$1</mark>");
 }
 
 function parseGitHubRepo(url: string) {
@@ -342,7 +632,7 @@ function escapeHtml(value: string): string {
     .replace(/'/g, "&#039;");
 }
 
-function renderMarkdown(markdown: string): string {
+function renderMarkdown(markdown: string, search: SearchQuery): string {
   const codeBlocks: Array<{ lang: string; code: string }> = [];
   let html = markdown.replace(/```(\w+)?\n([\s\S]*?)```/g, (_, lang = "", code) => {
     const token = `@@CODE_${codeBlocks.length}@@`;
@@ -357,11 +647,11 @@ function renderMarkdown(markdown: string): string {
 
   function flushLists() {
     if (list.length) {
-      segments.push(`<ul>${list.map((item) => `<li>${item}</li>`).join("")}</ul>`);
+      segments.push(`<ul>${list.map((item) => `<li>${highlightEscapedHtml(item, search)}</li>`).join("")}</ul>`);
       list = [];
     }
     if (orderedList.length) {
-      segments.push(`<ol>${orderedList.map((item) => `<li>${item}</li>`).join("")}</ol>`);
+      segments.push(`<ol>${orderedList.map((item) => `<li>${highlightEscapedHtml(item, search)}</li>`).join("")}</ol>`);
       orderedList = [];
     }
   }
@@ -371,7 +661,8 @@ function renderMarkdown(markdown: string): string {
       flushLists();
       const index = Number(line.trim().match(/\d+/)![0]);
       const block = codeBlocks[index];
-      segments.push(`<pre><code data-lang="${escapeHtml(block.lang)}">${escapeHtml(block.code.trim())}</code></pre>`);
+      const code = highlightEscapedHtml(escapeHtml(block.code.trim()), search);
+      segments.push(`<pre><code data-lang="${escapeHtml(block.lang)}">${code}</code></pre>`);
       return;
     }
     const unordered = line.match(/^- (.*)$/);
@@ -387,7 +678,7 @@ function renderMarkdown(markdown: string): string {
       return;
     }
     flushLists();
-    if (line.trim()) segments.push(`<p>${line}</p>`);
+    if (line.trim()) segments.push(`<p>${highlightEscapedHtml(line, search)}</p>`);
   });
 
   flushLists();
@@ -400,44 +691,88 @@ function App() {
   const [localState, setLocalState] = useState<LocalState>(() => loadJson(stateKey, { prompts: {} }));
   const [promptIndex, setPromptIndex] = useState<PromptIndex>(() => loadJson(cacheKey, fallbackIndex));
   const [query, setQuery] = useState("");
-  const [selectedIndex, setSelectedIndex] = useState(0);
-  const [status, setStatus] = useState("Ready");
+  const [selectedPromptId, setSelectedPromptId] = useState<string | null>(null);
+  const [status, setStatus] = useState("");
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [manualCopyText, setManualCopyText] = useState("");
   const [copiedPromptId, setCopiedPromptId] = useState<string | null>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const configRef = useRef(config);
+  const settingsOpenRef = useRef(settingsOpen);
+  const manualCopyTextRef = useRef(manualCopyText);
+  const language = resolveLanguage(config.languageMode);
+  const t = messages[language];
+  const search = useMemo(() => parseSearchQuery(query), [query]);
 
-  const visiblePrompts = useMemo(() => {
+  const scoredPrompts = useMemo(() => {
     return promptIndex.prompts
       .map((prompt) => ({
         prompt,
-        score: scorePrompt(prompt, query, getPromptState(localState, prompt.id)),
+        local: getPromptState(localState, prompt.id),
+        score: scorePrompt(prompt, search, getPromptState(localState, prompt.id)),
       }))
-      .filter(({ score }) => !query.trim() || score > 0)
-      .sort((a, b) => b.score - a.score || a.prompt.title.localeCompare(b.prompt.title))
-      .map(({ prompt }) => prompt);
-  }, [localState, promptIndex, query]);
+      .filter(({ score }) => score > 0);
+  }, [localState, promptIndex, search]);
 
-  const selectedPrompt = visiblePrompts[Math.min(selectedIndex, Math.max(visiblePrompts.length - 1, 0))];
+  const promptSections = useMemo(() => buildSections(scoredPrompts, search, config, t), [config, scoredPrompts, search, t]);
+  const visiblePrompts = useMemo(() => uniqueById(promptSections.flatMap((section) => section.prompts.map((prompt) => ({
+    prompt,
+    local: getPromptState(localState, prompt.id),
+    score: 1,
+  })))).map(({ prompt }) => prompt), [localState, promptSections]);
+
+  const selectedIndex = Math.max(visiblePrompts.findIndex((prompt) => prompt.id === selectedPromptId), 0);
+  const selectedPrompt = visiblePrompts[selectedIndex] ?? visiblePrompts[0];
 
   useEffect(() => {
     localStorage.setItem(configKey, JSON.stringify(config));
+    configRef.current = config;
   }, [config]);
+
+  useEffect(() => {
+    settingsOpenRef.current = settingsOpen;
+  }, [settingsOpen]);
+
+  useEffect(() => {
+    manualCopyTextRef.current = manualCopyText;
+  }, [manualCopyText]);
 
   useEffect(() => {
     document.documentElement.dataset.theme = config.themeMode;
     document.documentElement.style.colorScheme = config.themeMode === "system" ? "light dark" : config.themeMode;
   }, [config.themeMode]);
 
+  const focusSearch = useCallback(() => {
+    window.setTimeout(() => {
+      searchInputRef.current?.focus();
+      searchInputRef.current?.select();
+    }, 30);
+  }, []);
+
+  const showLauncher = useCallback(async () => {
+    const appWindow = getCurrentWindow();
+    await appWindow.unminimize();
+    await appWindow.show();
+    await appWindow.setFocus();
+    focusSearch();
+  }, [focusSearch]);
+
+  const hideLauncher = useCallback(async () => {
+    await getCurrentWindow().hide();
+  }, []);
+
+  const toggleLauncher = useCallback(async () => {
+    const appWindow = getCurrentWindow();
+    if (await appWindow.isVisible()) {
+      await appWindow.hide();
+      return "hidden";
+    }
+    await showLauncher();
+    return "shown";
+  }, [showLauncher]);
+
   useEffect(() => {
     let cancelled = false;
-
-    function focusSearch() {
-      window.setTimeout(() => {
-        searchInputRef.current?.focus();
-        searchInputRef.current?.select();
-      }, 30);
-    }
 
     async function registerWakeShortcut() {
       try {
@@ -446,12 +781,8 @@ function App() {
         }
         await register(config.wakeShortcut, async (event) => {
           if (event.state !== "Pressed") return;
-          const appWindow = getCurrentWindow();
-          await appWindow.unminimize();
-          await appWindow.show();
-          await appWindow.setFocus();
-          focusSearch();
-          setStatus(`Wake shortcut triggered: ${event.shortcut}`);
+          const nextState = await toggleLauncher();
+          setStatus(`Wake shortcut triggered (${nextState}): ${event.shortcut}`);
         });
         const registered = await isRegistered(config.wakeShortcut);
         if (!cancelled) {
@@ -470,7 +801,52 @@ function App() {
       cancelled = true;
       unregister(config.wakeShortcut).catch(() => {});
     };
-  }, [config.wakeShortcut]);
+  }, [config.wakeShortcut, toggleLauncher]);
+
+  useEffect(() => {
+    const appWindow = getCurrentWindow();
+    appWindow.setAlwaysOnTop(config.alwaysOnTop).catch((error) => {
+      setStatus(`Always on top unavailable: ${error instanceof Error ? error.message : String(error)}`);
+    });
+  }, [config.alwaysOnTop]);
+
+  useEffect(() => {
+    let disposed = false;
+    let unlisten: (() => void) | null = null;
+
+    function hideAfterBlur() {
+      window.setTimeout(() => {
+        if (!disposed && !configRef.current.alwaysOnTop && !settingsOpenRef.current && !manualCopyTextRef.current) {
+          hideLauncher().catch(() => {});
+        }
+      }, 80);
+    }
+
+    function handleWindowBlur() {
+      if (configRef.current.alwaysOnTop || settingsOpenRef.current || manualCopyTextRef.current) return;
+      hideAfterBlur();
+    }
+
+    window.addEventListener("blur", handleWindowBlur);
+
+    getCurrentWindow()
+      .onFocusChanged(({ payload: focused }) => {
+        if (focused || configRef.current.alwaysOnTop || settingsOpenRef.current || manualCopyTextRef.current) return;
+        hideAfterBlur();
+      })
+      .then((nextUnlisten) => {
+        unlisten = nextUnlisten;
+      })
+      .catch((error) => {
+        setStatus(`Window blur handler unavailable: ${error instanceof Error ? error.message : String(error)}`);
+      });
+
+    return () => {
+      disposed = true;
+      window.removeEventListener("blur", handleWindowBlur);
+      unlisten?.();
+    };
+  }, [hideLauncher]);
 
   useEffect(() => {
     localStorage.setItem(stateKey, JSON.stringify(localState));
@@ -481,11 +857,17 @@ function App() {
   }, [promptIndex]);
 
   useEffect(() => {
-    setSelectedIndex(0);
-  }, [query, promptIndex]);
+    if (!visiblePrompts.length) {
+      setSelectedPromptId(null);
+      return;
+    }
+    if (!selectedPromptId || !visiblePrompts.some((prompt) => prompt.id === selectedPromptId)) {
+      setSelectedPromptId(visiblePrompts[0].id);
+    }
+  }, [selectedPromptId, visiblePrompts]);
 
   async function syncNow() {
-    setStatus("Syncing GitHub repository...");
+    setStatus(t.syncing);
     try {
       const nextIndex = await syncPrompts(config);
       setPromptIndex(nextIndex);
@@ -514,10 +896,13 @@ function App() {
       });
       setCopiedPromptId(selectedPrompt.id);
       window.setTimeout(() => setCopiedPromptId((id) => (id === selectedPrompt.id ? null : id)), 1200);
-      setStatus("Copied");
+      setStatus(t.copied);
+      window.setTimeout(() => {
+        hideLauncher().catch(() => {});
+      }, 420);
     } catch {
       setManualCopyText(selectedPrompt.body);
-      setStatus("Clipboard blocked; prompt text selected");
+      setStatus(t.clipboardBlocked);
     }
   }
 
@@ -540,11 +925,15 @@ function App() {
       promptsDir: stripSlashes(draftConfig.promptsDir || defaultConfig.promptsDir),
       wakeShortcut: draftConfig.wakeShortcut || defaultConfig.wakeShortcut,
       themeMode: draftConfig.themeMode || defaultConfig.themeMode,
+      languageMode: draftConfig.languageMode || defaultConfig.languageMode,
+      alwaysOnTop: Boolean(draftConfig.alwaysOnTop),
+      listMode: draftConfig.listMode || defaultConfig.listMode,
+      pinFavorites: Boolean(draftConfig.pinFavorites),
     };
     setConfig(nextConfig);
     setDraftConfig(nextConfig);
     setSettingsOpen(false);
-    setStatus("Settings saved");
+    setStatus(messages[resolveLanguage(nextConfig.languageMode)].settingsSaved);
   }
 
   return (
@@ -559,21 +948,36 @@ function App() {
               ref={searchInputRef}
               autoComplete="off"
               spellCheck={false}
-              placeholder="Search prompts..."
+              placeholder={language === "zh-CN" ? "搜索提示词..." : "Search prompts..."}
               value={query}
               onChange={(event) => setQuery(event.currentTarget.value)}
               onKeyDown={(event) => {
                 if (event.key === "Enter") copySelectedPrompt();
-                if (event.key === "ArrowDown") setSelectedIndex((index) => Math.min(index + 1, visiblePrompts.length - 1));
-                if (event.key === "ArrowUp") setSelectedIndex((index) => Math.max(index - 1, 0));
+                if (event.key === "ArrowDown") {
+                  const nextIndex = Math.min(selectedIndex + 1, visiblePrompts.length - 1);
+                  setSelectedPromptId(visiblePrompts[nextIndex]?.id ?? null);
+                }
+                if (event.key === "ArrowUp") {
+                  const nextIndex = Math.max(selectedIndex - 1, 0);
+                  setSelectedPromptId(visiblePrompts[nextIndex]?.id ?? null);
+                }
                 if (event.key === "Escape") setQuery("");
               }}
             />
           </label>
-          <button className="icon-button" type="button" title="Sync" aria-label="Sync" onClick={syncNow}>
+          <button className="icon-button" type="button" title={t.sync} aria-label={t.sync} onClick={syncNow}>
             ↻
           </button>
-          <button className="icon-button" type="button" title="Settings" aria-label="Settings" onClick={() => setSettingsOpen(true)}>
+          <button
+            className="icon-button"
+            type="button"
+            title={t.settings}
+            aria-label={t.settings}
+            onClick={() => {
+              setDraftConfig(config);
+              setSettingsOpen(true);
+            }}
+          >
             ⚙
           </button>
         </header>
@@ -581,41 +985,77 @@ function App() {
         <div className="content">
           <aside className="results-panel">
             <div className="panel-label">
-              <span>{visiblePrompts.length} prompts</span>
-              <span>{query.trim() ? "matched" : promptIndex.source || "local"}</span>
+              <span>{visiblePrompts.length} {t.prompts}</span>
+              <span>{query.trim() ? t.matched : promptIndex.source || "local"}</span>
+            </div>
+            <div className="mode-tabs" aria-label={t.listMode}>
+              {([
+                ["smart", t.showSmart],
+                ["relevance", t.showRelevance],
+                ["recent", t.showRecent],
+                ["favorites", t.showFavorites],
+                ["used", t.showUsed],
+              ] as Array<[AppConfig["listMode"], string]>).map(([mode, label]) => (
+                <button
+                  key={mode}
+                  type="button"
+                  className={`mode-tab${config.listMode === mode ? " is-active" : ""}`}
+                  onClick={() => {
+                    const nextConfig = { ...config, listMode: mode };
+                    setConfig(nextConfig);
+                    setDraftConfig(nextConfig);
+                  }}
+                >
+                  {label}
+                </button>
+              ))}
             </div>
             <div className="results" role="listbox">
-              {visiblePrompts.map((prompt, index) => {
-                const promptState = getPromptState(localState, prompt.id);
-                return (
-                  <button
-                    key={prompt.id}
-                    type="button"
-                    className={`result${index === selectedIndex ? " is-selected" : ""}`}
-                    onClick={() => setSelectedIndex(index)}
-                  >
-                    <span className={`favorite-mark${promptState.favorite ? " is-on" : ""}`}>
-                      {promptState.favorite ? "★" : "☆"}
-                    </span>
-                    <span>
-                      <span className="result-title">{prompt.title}</span>
-                      <span className="result-description">{prompt.description}</span>
-                      <span className="result-tags">
-                        {prompt.tags.slice(0, 3).map((tag) => (
-                          <span className="tag" key={tag}>#{tag}</span>
-                        ))}
-                      </span>
-                    </span>
-                  </button>
-                );
-              })}
+              {promptSections.map((section) => (
+                <section className="result-section" key={section.id}>
+                  <div className="result-section-title">{section.label}</div>
+                  {section.prompts.map((prompt) => {
+                    const index = visiblePrompts.findIndex((item) => item.id === prompt.id);
+                    const promptState = getPromptState(localState, prompt.id);
+                    return (
+                      <button
+                        key={`${section.id}-${prompt.id}`}
+                        type="button"
+                        className={`result${index === selectedIndex ? " is-selected" : ""}`}
+                        onClick={() => setSelectedPromptId(prompt.id)}
+                      >
+                        <span className={`favorite-mark${promptState.favorite ? " is-on" : ""}`}>
+                          {promptState.favorite ? "★" : "☆"}
+                        </span>
+                        <span>
+                          <span className="result-title">{highlightText(prompt.title, search)}</span>
+                          <span className="result-description">{highlightText(prompt.description, search)}</span>
+                          <span className="result-tags">
+                            {prompt.tags.slice(0, 3).map((tag) => (
+                              <span className="tag" key={tag}>#{highlightText(tag, search)}</span>
+                            ))}
+                          </span>
+                          {promptState.lastUsedAt && (
+                            <span className="result-usage">
+                              {t.recent}: {new Date(promptState.lastUsedAt).toLocaleDateString()} · {t.showUsed}: {promptState.useCount}
+                            </span>
+                          )}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </section>
+              ))}
+              {!visiblePrompts.length && (
+                <div className="empty-results">{t.noPromptSelected}</div>
+              )}
             </div>
           </aside>
 
           <section className="preview-panel">
             <div className="preview-meta">
               <div>
-                <h1>{selectedPrompt?.title || "No prompt selected"}</h1>
+                <h1>{selectedPrompt?.title || t.noPromptSelected}</h1>
                 <p>{selectedPrompt?.description || ""}</p>
               </div>
               <div className="preview-actions">
@@ -625,10 +1065,10 @@ function App() {
                   onClick={copySelectedPrompt}
                   aria-live="polite"
                 >
-                  <span className="copy-label">{selectedPrompt && copiedPromptId === selectedPrompt.id ? "Copied" : "Copy"}</span>
+                  <span className="copy-label">{selectedPrompt && copiedPromptId === selectedPrompt.id ? t.copied : t.copy}</span>
                   {selectedPrompt && copiedPromptId === selectedPrompt.id && <span className="copy-spark" aria-hidden="true">✓</span>}
                 </button>
-                <button className="icon-button" type="button" title="Favorite" onClick={toggleFavorite}>
+                <button className="icon-button" type="button" title={t.favorite} onClick={toggleFavorite}>
                   {selectedPrompt && getPromptState(localState, selectedPrompt.id).favorite ? "★" : "☆"}
                 </button>
               </div>
@@ -639,17 +1079,17 @@ function App() {
               ))}
             </div>
             <div className="path-line">{selectedPrompt?.path}</div>
-            <article className="markdown" dangerouslySetInnerHTML={{ __html: selectedPrompt ? renderMarkdown(selectedPrompt.body) : "" }} />
+            <article className="markdown" dangerouslySetInnerHTML={{ __html: selectedPrompt ? renderMarkdown(selectedPrompt.body, search) : "" }} />
           </section>
         </div>
 
         <footer className="statusbar">
           <div className="keymap">
-            <span><kbd>Enter</kbd> Copy</span>
-            <span><kbd>↑↓</kbd> Navigate</span>
-            <span><kbd>Esc</kbd> Clear</span>
+            <span><kbd>Enter</kbd> {t.copy}</span>
+            <span><kbd>↑↓</kbd> {t.navigate}</span>
+            <span><kbd>Esc</kbd> {t.clear}</span>
           </div>
-          <div className="status-text">{status || `Using ${promptIndex.library?.name || "prompt library"}`}</div>
+          <div className="status-text">{status || `${t.source}: ${promptIndex.library?.name || "prompt library"}`}</div>
         </footer>
       </section>
 
@@ -658,8 +1098,8 @@ function App() {
           <div className="manual-copy-panel" onClick={(event) => event.stopPropagation()}>
             <div className="manual-copy-head">
               <div>
-                <h2>Copy prompt</h2>
-                <p>Clipboard access was blocked. The prompt text is selected below.</p>
+                <h2>{t.copyPrompt}</h2>
+                <p>{t.manualCopyHint}</p>
               </div>
               <button className="icon-button" type="button" onClick={() => setManualCopyText("")}>×</button>
             </div>
@@ -673,56 +1113,98 @@ function App() {
           <form className="settings-panel" onSubmit={(event) => { event.preventDefault(); saveSettings(); }}>
             <div className="settings-head">
               <div>
-                <h2>Settings</h2>
-                <p>Sync prompts from a public GitHub repository.</p>
+                <h2>{t.settings}</h2>
+                <p>{t.settingsSubtitle}</p>
               </div>
               <button className="icon-button" type="button" onClick={() => setSettingsOpen(false)}>×</button>
             </div>
             <label className="field">
-              <span>Repository URL</span>
+              <span>{t.repositoryUrl}</span>
               <input value={draftConfig.repoUrl} onChange={(event) => setDraftConfig({ ...draftConfig, repoUrl: event.currentTarget.value })} />
             </label>
             <div className="field-grid">
               <label className="field">
-                <span>Branch</span>
+                <span>{t.branch}</span>
                 <input value={draftConfig.branch} onChange={(event) => setDraftConfig({ ...draftConfig, branch: event.currentTarget.value })} />
               </label>
               <label className="field">
-                <span>Prompts directory</span>
+                <span>{t.promptsDirectory}</span>
                 <input value={draftConfig.promptsDir} onChange={(event) => setDraftConfig({ ...draftConfig, promptsDir: event.currentTarget.value })} />
               </label>
             </div>
             <label className="field">
-              <span>Wake shortcut</span>
+              <span>{t.wakeShortcut}</span>
               <input value={draftConfig.wakeShortcut} onChange={(event) => setDraftConfig({ ...draftConfig, wakeShortcut: event.currentTarget.value })} />
             </label>
-            <label className="field">
-              <span>Theme</span>
-              <select
-                value={draftConfig.themeMode}
-                onChange={(event) => setDraftConfig({ ...draftConfig, themeMode: event.currentTarget.value as AppConfig["themeMode"] })}
-              >
-                <option value="system">Follow system</option>
-                <option value="dark">Dark</option>
-                <option value="light">Light</option>
-              </select>
-            </label>
+            <div className="field-grid field-grid-compact">
+              <label className="field">
+                <span>{t.theme}</span>
+                <select
+                  value={draftConfig.themeMode}
+                  onChange={(event) => setDraftConfig({ ...draftConfig, themeMode: event.currentTarget.value as AppConfig["themeMode"] })}
+                >
+                  <option value="system">{t.followSystem}</option>
+                  <option value="dark">{t.dark}</option>
+                  <option value="light">{t.light}</option>
+                </select>
+              </label>
+              <label className="field">
+                <span>{t.language}</span>
+                <select
+                  value={draftConfig.languageMode}
+                  onChange={(event) => setDraftConfig({ ...draftConfig, languageMode: event.currentTarget.value as AppConfig["languageMode"] })}
+                >
+                  <option value="system">{t.followSystem}</option>
+                  <option value="zh-CN">中文</option>
+                  <option value="en-US">English</option>
+                </select>
+              </label>
+              <label className="field">
+                <span>{t.listMode}</span>
+                <select
+                  value={draftConfig.listMode}
+                  onChange={(event) => setDraftConfig({ ...draftConfig, listMode: event.currentTarget.value as AppConfig["listMode"] })}
+                >
+                  <option value="smart">{t.showSmart}</option>
+                  <option value="relevance">{t.showRelevance}</option>
+                  <option value="recent">{t.showRecent}</option>
+                  <option value="favorites">{t.showFavorites}</option>
+                  <option value="used">{t.showUsed}</option>
+                </select>
+              </label>
+            </div>
             <label className="check-field">
               <input
                 type="checkbox"
                 checked={draftConfig.syncOnLaunch}
                 onChange={(event) => setDraftConfig({ ...draftConfig, syncOnLaunch: event.currentTarget.checked })}
               />
-              <span>Sync on launch</span>
+              <span>{t.syncOnLaunch}</span>
+            </label>
+            <label className="check-field">
+              <input
+                type="checkbox"
+                checked={draftConfig.alwaysOnTop}
+                onChange={(event) => setDraftConfig({ ...draftConfig, alwaysOnTop: event.currentTarget.checked })}
+              />
+              <span>{t.alwaysOnTop}</span>
+            </label>
+            <label className="check-field">
+              <input
+                type="checkbox"
+                checked={draftConfig.pinFavorites}
+                onChange={(event) => setDraftConfig({ ...draftConfig, pinFavorites: event.currentTarget.checked })}
+              />
+              <span>{t.pinFavorites}</span>
             </label>
             <div className="settings-meta">
-              <div>Last sync: {promptIndex.generated_at ? new Date(promptIndex.generated_at).toLocaleString() : "never"}</div>
-              <div>Source: {promptIndex.source || "bundled"}</div>
+              <div>{language === "zh-CN" ? "上次同步" : "Last sync"}: {promptIndex.generated_at ? new Date(promptIndex.generated_at).toLocaleString() : (language === "zh-CN" ? "从未" : "never")}</div>
+              <div>{t.source}: {promptIndex.source || "bundled"}</div>
             </div>
             <div className="settings-actions">
-              <button className="text-button" type="button" onClick={() => setDraftConfig(defaultConfig)}>Reset</button>
-              <button className="text-button" type="button" onClick={syncNow}>Sync now</button>
-              <button className="text-button primary" type="submit">Save</button>
+              <button className="text-button" type="button" onClick={() => setDraftConfig(defaultConfig)}>{t.reset}</button>
+              <button className="text-button" type="button" onClick={syncNow}>{t.syncNow}</button>
+              <button className="text-button primary" type="submit">{t.save}</button>
             </div>
           </form>
         </section>
