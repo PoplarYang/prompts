@@ -1,0 +1,5 @@
+name: My Prompt Library
+version: 1
+default_locale: en
+prompts_dir: prompts
+

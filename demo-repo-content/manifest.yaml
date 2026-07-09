@@ -1,0 +1,5 @@
+name: pp Demo Prompt Library
+version: 1
+default_locale: zh-CN
+prompts_dir: prompts
+

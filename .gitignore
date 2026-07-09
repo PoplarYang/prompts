@@ -1,0 +1,50 @@
+# macOS / Windows
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Editor / local tooling
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Environment and local secrets
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Static release artifacts
+dist/
+
+# Node / Vite / Tauri frontend
+desktop/node_modules/
+desktop/dist/
+desktop/.vite/
+
+# Rust / Tauri native build output
+desktop/src-tauri/target/
+desktop/src-tauri/gen/
+
+# Tauri signing/private packaging files
+desktop/src-tauri/*.key
+desktop/src-tauri/*.p12
+desktop/src-tauri/*.mobileprovision
+desktop/src-tauri/.tauri/
+
+# Demo repository contents should be committed as plain files, not as a nested repository.
+demo-repo-content/.git/

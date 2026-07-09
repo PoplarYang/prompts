@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>pp v1.0</title>
+    <link rel="stylesheet" href="./styles.css?v=1.0.2" />
+  </head>
+  <body>
+    <main class="shell" aria-label="pp prompt launcher">
+      <section class="launcher" aria-label="Prompt launcher">
+        <header class="topbar">
+          <div class="brand" aria-label="pp">pp</div>
+          <label class="search-wrap" for="searchInput">
+            <span class="search-icon" aria-hidden="true">⌕</span>
+            <input id="searchInput" type="search" autocomplete="off" spellcheck="false" placeholder="Search prompts..." />
+          </label>
+          <button id="syncButton" class="icon-button" type="button" title="Sync" aria-label="Sync">↻</button>
+          <button id="settingsButton" class="icon-button" type="button" title="Settings" aria-label="Settings">⚙</button>
+        </header>
+
+        <div class="content">
+          <aside class="results-panel" aria-label="Prompt results">
+            <div class="panel-label">
+              <span id="resultCount">0 prompts</span>
+              <span id="sortHint">ranked</span>
+            </div>
+            <div id="results" class="results" role="listbox" aria-label="Search results"></div>
+          </aside>
+
+          <section class="preview-panel" aria-label="Prompt preview">
+            <div class="preview-meta">
+              <div>
+                <h1 id="previewTitle">No prompt selected</h1>
+                <p id="previewDescription"></p>
+              </div>
+              <div class="preview-actions">
+                <button id="copyButton" class="text-button" type="button">Copy</button>
+                <button id="favoriteButton" class="icon-button" type="button" title="Favorite" aria-label="Favorite">☆</button>
+              </div>
+            </div>
+            <div id="previewTags" class="tag-row"></div>
+            <div id="previewPath" class="path-line"></div>
+            <article id="previewBody" class="markdown"></article>
+          </section>
+        </div>
+
+        <footer class="statusbar">
+          <div class="keymap">
+            <span><kbd>Enter</kbd> Copy</span>
+            <span><kbd>↑↓</kbd> Navigate</span>
+            <span><kbd>⌘/Ctrl F</kbd> Favorite</span>
+            <span><kbd>Esc</kbd> Clear</span>
+          </div>
+          <div id="statusText" class="status-text">Loading prompt index</div>
+        </footer>
+      </section>
+
+      <section id="manualCopy" class="manual-copy" aria-label="Manual copy fallback" hidden>
+        <div class="manual-copy-panel">
+          <div class="manual-copy-head">
+            <div>
+              <h2>Copy prompt</h2>
+              <p>Clipboard access was blocked. The prompt text is selected below.</p>
+            </div>
+            <button id="closeManualCopy" class="icon-button" type="button" title="Close" aria-label="Close">×</button>
+          </div>
+          <textarea id="manualCopyText" spellcheck="false"></textarea>
+        </div>
+      </section>
+
+      <section id="settingsPanel" class="settings" aria-label="Settings" hidden>
+        <form id="settingsForm" class="settings-panel">
+          <div class="settings-head">
+            <div>
+              <h2>Settings</h2>
+              <p>Sync prompts from a public GitHub repository.</p>
+            </div>
+            <button id="closeSettings" class="icon-button" type="button" title="Close" aria-label="Close">×</button>
+          </div>
+
+          <label class="field">
+            <span>Repository URL</span>
+            <input id="repoUrlInput" type="url" spellcheck="false" />
+          </label>
+
+          <div class="field-grid">
+            <label class="field">
+              <span>Branch</span>
+              <input id="branchInput" type="text" spellcheck="false" />
+            </label>
+            <label class="field">
+              <span>Prompts directory</span>
+              <input id="promptsDirInput" type="text" spellcheck="false" />
+            </label>
+          </div>
+
+          <label class="check-field">
+            <input id="syncOnLaunchInput" type="checkbox" />
+            <span>Sync on launch</span>
+          </label>
+
+          <label class="field">
+            <span>Wake shortcut</span>
+            <input id="wakeShortcutInput" type="text" spellcheck="false" />
+          </label>
+
+          <div class="settings-meta">
+            <div id="settingsLastSync">Last sync: never</div>
+            <div id="settingsSource">Source: bundled index</div>
+          </div>
+
+          <div class="settings-actions">
+            <button id="resetSettings" class="text-button" type="button">Reset</button>
+            <button id="syncSettings" class="text-button" type="button">Sync now</button>
+            <button class="text-button primary" type="submit">Save</button>
+          </div>
+        </form>
+      </section>
+    </main>
+
+    <script src="./app.js?v=1.0.2"></script>
+  </body>
+</html>

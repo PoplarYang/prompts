@@ -1,0 +1,92 @@
+{
+  "library": {
+    "name": "pp Sample Prompt Library",
+    "version": 1,
+    "default_locale": "zh-CN",
+    "prompts_dir": "prompts"
+  },
+  "generated_at": "",
+  "prompts": [
+    {
+      "id": "prompts/coding/code-review.md",
+      "title": "Code Review Assistant",
+      "description": "审查代码风险、回归问题和测试缺口",
+      "tags": [
+        "coding",
+        "review"
+      ],
+      "category": "coding",
+      "aliases": [
+        "cr",
+        "review code"
+      ],
+      "path": "prompts/coding/code-review.md",
+      "body": "你是一名严格但友好的 senior engineer。\n\n请审查下面的代码，优先指出：\n\n- bug\n- 行为回归风险\n- 缺失测试\n- 可维护性问题\n\n请按严重程度排序，并给出具体文件、行号和修改建议。\n\n代码如下：\n\n```ts\n{{code}}\n```\n"
+    },
+    {
+      "id": "prompts/coding/explain-error.md",
+      "title": "Explain Error",
+      "description": "解释报错原因并给出排查路径",
+      "tags": [
+        "coding",
+        "debug"
+      ],
+      "category": "coding",
+      "aliases": [
+        "debug",
+        "error"
+      ],
+      "path": "prompts/coding/explain-error.md",
+      "body": "请帮我解释下面的报错。\n\n请包含：\n\n- 这个错误通常意味着什么\n- 最可能的 3 个原因\n- 如何一步步排查\n- 如果需要修改代码，给出最小修改建议\n\n报错信息：\n\n```txt\n{{error}}\n```\n\n相关代码：\n\n```txt\n{{code}}\n```\n"
+    },
+    {
+      "id": "prompts/personal/weekly-review.md",
+      "title": "Weekly Review",
+      "description": "做一次个人周复盘",
+      "tags": [
+        "personal",
+        "review"
+      ],
+      "category": "personal",
+      "aliases": [
+        "weekly",
+        "retro"
+      ],
+      "path": "prompts/personal/weekly-review.md",
+      "body": "请帮我做一次本周复盘。\n\n请基于下面的记录，整理：\n\n- 本周完成了什么\n- 哪些事情推进得不顺\n- 哪些决定是重要的\n- 下周最值得优先做的 3 件事\n- 有哪些可以简化或停止的事情\n\n本周记录：\n\n{{notes}}\n"
+    },
+    {
+      "id": "prompts/writing/rewrite-clearly.md",
+      "title": "Rewrite Clearly",
+      "description": "把一段文字改得更清楚、更自然",
+      "tags": [
+        "writing",
+        "rewrite"
+      ],
+      "category": "writing",
+      "aliases": [
+        "polish",
+        "clarify"
+      ],
+      "path": "prompts/writing/rewrite-clearly.md",
+      "body": "请把下面这段文字改写得更清楚、更自然。\n\n要求：\n\n- 保留原意\n- 减少废话\n- 语气友好但不夸张\n- 如果逻辑不清楚，请顺手调整结构\n\n原文：\n\n{{text}}\n"
+    },
+    {
+      "id": "prompts/writing/summarize-article.md",
+      "title": "Summarize Article",
+      "description": "总结文章重点并提炼行动项",
+      "tags": [
+        "writing",
+        "summary"
+      ],
+      "category": "writing",
+      "aliases": [
+        "summary",
+        "summarize"
+      ],
+      "path": "prompts/writing/summarize-article.md",
+      "body": "请总结下面这篇文章。\n\n输出结构：\n\n1. 一句话概括\n2. 5 个关键观点\n3. 重要细节\n4. 可执行建议\n5. 值得继续追问的问题\n\n文章：\n\n{{article}}\n"
+    }
+  ],
+  "errors": []
+}
