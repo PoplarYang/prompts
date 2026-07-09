@@ -2,7 +2,7 @@
 
 `pp` is a lightweight, GitHub-native prompt launcher.
 
-The current `v1.0` release is a dependency-free static app that proves the core workflow: sync prompts from a public GitHub repository, cache them locally, search them quickly, preview Markdown, and copy the selected prompt.
+The current release includes a Tauri 2 desktop app for macOS and Windows, plus the original dependency-free static prototype. It can sync prompts from a public GitHub repository, cache them locally for offline use, search quickly, preview Markdown, and copy the selected prompt.
 
 Default prompt repository:
 
@@ -21,7 +21,7 @@ https://github.com/PoplarYang/prompts
 - jsDelivr fallback when GitHub tree API is unavailable or rate-limited.
 - Offline cache using browser storage.
 - Settings for repository URL, branch, prompt directory, and sync-on-launch.
-- Custom wake shortcut setting, ready for the native Tauri desktop track.
+- Custom wake shortcut in the desktop app.
 - Desktop theme setting for system, dark, and light modes.
 - Desktop copy success feedback with a short visual affordance.
 - Human-readable Markdown + YAML prompt repository format.
@@ -30,15 +30,8 @@ https://github.com/PoplarYang/prompts
 
 Static prototype:
 
-Build the bundled fallback prompt index:
-
 ```sh
 python3 scripts/build_prompt_index.py
-```
-
-Start a local server:
-
-```sh
 python3 -m http.server 8765
 ```
 
@@ -114,20 +107,30 @@ dist/pp-desktop-macos-<arch>.dmg
 
 The current desktop artifacts are unsigned and not notarized, so macOS may show a security prompt when opening them outside this development machine.
 
-Windows packages are built in GitHub Actions with `npm run tauri build -- --bundles nsis` on `windows-latest`.
+Windows packages are built in GitHub Actions with:
+
+```sh
+npm run tauri build -- --bundles nsis
+```
 
 ## Prompt Repository
 
-Use [prompt-repo-template](prompt-repo-template) to create a compatible prompt repository.
-
-Expected structure:
+The default prompt repository content lives at the root of this repository:
 
 ```txt
 manifest.yaml
 prompts/
   coding/
     code-review.md
+    explain-error.md
+  writing/
+    rewrite-clearly.md
+    summarize-article.md
+  personal/
+    weekly-review.md
 ```
+
+Use [prompt-repo-template](prompt-repo-template) to create another compatible prompt repository.
 
 Prompt example:
 
@@ -153,18 +156,7 @@ Full spec: [docs/prompt-repository-spec.md](docs/prompt-repository-spec.md)
 
 ## Demo Repository Content
 
-Copy the contents of [demo-repo-content](demo-repo-content) into the root of [PoplarYang/prompts](https://github.com/PoplarYang/prompts).
-
-Expected structure:
-
-```txt
-README.md
-manifest.yaml
-prompts/
-  coding/
-  writing/
-  personal/
-```
+The same sample content is also available under [demo-repo-content](demo-repo-content) for testing sync behavior.
 
 ## Screenshots
 
