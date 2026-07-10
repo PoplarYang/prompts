@@ -1,5 +1,10 @@
 # Changelog
 
+## Desktop 0.1.3
+
+- Updated the desktop app icon with the selected bright rounded `pp` mark.
+- Added an editable SVG icon source and regenerated macOS, Windows, and PNG icon assets.
+
 ## Desktop 0.1.2
 
 - Fixed Windows release build by compiling macOS Dock reopen handling only on macOS.

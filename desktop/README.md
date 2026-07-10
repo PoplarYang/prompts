@@ -2,7 +2,7 @@
 
 Tauri 2 + React + TypeScript desktop app for `pp`.
 
-Current desktop version: `0.1.2`.
+Current desktop version: `0.1.3`.
 
 ## Development
 
