@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
+import { invoke } from "@tauri-apps/api/core";
 import { isRegistered, register, unregister } from "@tauri-apps/plugin-global-shortcut";
+import { openUrl } from "@tauri-apps/plugin-opener";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import "./App.css";
 
@@ -13,6 +15,7 @@ type Prompt = {
   aliases: string[];
   path: string;
   body: string;
+  source?: "github" | "local" | "bundled";
 };
 
 type PromptIndex = {
@@ -34,6 +37,9 @@ type AppConfig = {
   repoUrl: string;
   branch: string;
   promptsDir: string;
+  promptSource: "github" | "local";
+  localRootDir: string;
+  localPromptsDir: string;
   syncOnLaunch: boolean;
   wakeShortcut: string;
   themeMode: "system" | "dark" | "light";
@@ -73,10 +79,23 @@ type PromptSection = {
   prompts: Prompt[];
 };
 
+type LocalPromptFile = {
+  path: string;
+  raw: string;
+};
+
+type LocalPromptFiles = {
+  manifest?: string | null;
+  files: LocalPromptFile[];
+};
+
 const defaultConfig: AppConfig = {
   repoUrl: "https://github.com/PoplarYang/prompts",
   branch: "main",
   promptsDir: "prompts",
+  promptSource: "github",
+  localRootDir: "",
+  localPromptsDir: "prompts",
   syncOnLaunch: false,
   wakeShortcut: "CommandOrControl+Shift+P",
   themeMode: "system",
@@ -85,6 +104,9 @@ const defaultConfig: AppConfig = {
   listMode: "smart",
   pinFavorites: true,
 };
+
+const currentVersion = "0.1.4";
+const latestReleaseUrl = "https://api.github.com/repos/PoplarYang/prompts/releases/latest";
 
 const messages = {
   "en-US": {
@@ -102,6 +124,9 @@ const messages = {
     language: "Language",
     light: "Light",
     listMode: "Default list",
+    localPromptsDirectory: "Local prompts directory",
+    localRootDirectory: "Local folder",
+    localSource: "Local",
     manualCopyHint: "Clipboard access was blocked. The prompt text is selected below.",
     matched: "matched",
     mostUsed: "Most used",
@@ -117,18 +142,23 @@ const messages = {
     save: "Save",
     settings: "Settings",
     settingsSaved: "Settings saved",
-    settingsSubtitle: "Sync prompts from a public GitHub repository.",
+    settingsSubtitle: "Use prompts from GitHub or a local folder.",
     showFavorites: "Favorites",
     showRecent: "Recent",
     showRelevance: "Relevance",
     showSmart: "Smart",
     showUsed: "Used",
     source: "Source",
+    sourceMode: "Prompt source",
     sync: "Sync",
     syncNow: "Sync now",
     syncOnLaunch: "Sync on launch",
-    syncing: "Syncing GitHub repository...",
+    syncing: "Loading prompts...",
     theme: "Theme",
+    updateAvailable: "Update available",
+    checkUpdates: "Check updates",
+    checkingUpdates: "Checking updates...",
+    latestVersion: "You are on the latest version",
     wakeShortcut: "Wake shortcut",
   },
   "zh-CN": {
@@ -146,6 +176,9 @@ const messages = {
     language: "语言",
     light: "浅色",
     listMode: "默认列表",
+    localPromptsDirectory: "本地提示词目录",
+    localRootDirectory: "本地文件夹",
+    localSource: "本地",
     manualCopyHint: "剪贴板访问被阻止。下面的提示词文本已选中。",
     matched: "匹配",
     mostUsed: "常用",
@@ -161,18 +194,23 @@ const messages = {
     save: "保存",
     settings: "设置",
     settingsSaved: "设置已保存",
-    settingsSubtitle: "从公开 GitHub 仓库同步提示词。",
+    settingsSubtitle: "从 GitHub 或本地文件夹读取提示词。",
     showFavorites: "收藏",
     showRecent: "最近",
     showRelevance: "相关",
     showSmart: "智能",
     showUsed: "常用",
     source: "来源",
+    sourceMode: "提示词来源",
     sync: "同步",
     syncNow: "立即同步",
     syncOnLaunch: "启动时同步",
-    syncing: "正在同步 GitHub 仓库...",
+    syncing: "正在加载提示词...",
     theme: "主题",
+    updateAvailable: "发现新版本",
+    checkUpdates: "检查更新",
+    checkingUpdates: "正在检查更新...",
+    latestVersion: "已是最新版本",
     wakeShortcut: "唤醒快捷键",
   },
 } as const;
@@ -253,6 +291,8 @@ const fallbackIndex: PromptIndex = {
 const configKey = "pp-desktop-config";
 const stateKey = "pp-desktop-state";
 const cacheKey = "pp-desktop-cache";
+const githubCacheKey = "pp-desktop-cache-github";
+const localCacheKey = "pp-desktop-cache-local";
 
 function loadJson<T>(key: string, fallback: T): T {
   try {
@@ -261,6 +301,51 @@ function loadJson<T>(key: string, fallback: T): T {
   } catch {
     return fallback;
   }
+}
+
+function cacheKeyForSource(source: AppConfig["promptSource"]): string {
+  return source === "local" ? localCacheKey : githubCacheKey;
+}
+
+function compareVersions(a: string, b: string): number {
+  const left = a.replace(/^v/, "").split(".").map((part) => Number(part) || 0);
+  const right = b.replace(/^v/, "").split(".").map((part) => Number(part) || 0);
+  const length = Math.max(left.length, right.length);
+  for (let index = 0; index < length; index += 1) {
+    const diff = (left[index] || 0) - (right[index] || 0);
+    if (diff) return diff;
+  }
+  return 0;
+}
+
+function sourceIcon(source?: Prompt["source"]) {
+  if (source === "github") {
+    return (
+      <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+        <path
+          fill="currentColor"
+          d="M8 1.2A6.8 6.8 0 0 0 5.85 14.45c.34.06.46-.15.46-.33v-1.28c-1.9.41-2.3-.8-2.3-.8-.31-.79-.76-1-.76-1-.62-.42.05-.41.05-.41.69.05 1.05.71 1.05.71.61 1.04 1.59.74 1.98.57.06-.44.24-.74.43-.91-1.52-.17-3.12-.76-3.12-3.38 0-.75.27-1.36.7-1.84-.07-.17-.31-.87.07-1.81 0 0 .58-.18 1.88.7A6.49 6.49 0 0 1 8 4.96c.58 0 1.16.08 1.71.23 1.3-.88 1.87-.7 1.87-.7.38.94.14 1.64.07 1.81.44.48.7 1.09.7 1.84 0 2.63-1.6 3.2-3.13 3.37.25.22.47.64.47 1.29v1.92c0 .18.12.39.47.32A6.8 6.8 0 0 0 8 1.2Z"
+        />
+      </svg>
+    );
+  }
+  if (source === "local") {
+    return (
+      <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+        <path
+          fill="currentColor"
+          d="M1.8 4.1c0-.72.58-1.3 1.3-1.3h3.1c.38 0 .74.17.99.46l.83.94h4.88c.72 0 1.3.58 1.3 1.3v6.4c0 .72-.58 1.3-1.3 1.3H3.1c-.72 0-1.3-.58-1.3-1.3V4.1Zm1.3-.1a.1.1 0 0 0-.1.1v1h11v-.6a.1.1 0 0 0-.1-.1H7.48l-1.2-1.35A.1.1 0 0 0 6.2 3H3.1Zm-.1 2.3v5.6c0 .06.04.1.1.1h9.8a.1.1 0 0 0 .1-.1V6.3H3Z"
+        />
+      </svg>
+    );
+  }
+  return <span aria-hidden="true">•</span>;
+}
+
+function sourceLabel(source: Prompt["source"] | undefined, labels: Record<keyof typeof messages["en-US"], string>) {
+  if (source === "github") return "GitHub";
+  if (source === "local") return labels.localSource;
+  return "Bundled";
 }
 
 function normalize(value: unknown): string {
@@ -603,6 +688,7 @@ async function syncPrompts(config: AppConfig): Promise<PromptIndex> {
         aliases: normalizeList(typedMeta.aliases),
         path,
         body: body.trimEnd() + "\n",
+        source: "github" as const,
       };
     }),
   );
@@ -621,6 +707,53 @@ async function syncPrompts(config: AppConfig): Promise<PromptIndex> {
     prompts,
     errors: [],
   };
+}
+
+async function loadLocalPrompts(config: AppConfig): Promise<PromptIndex> {
+  const rootDir = config.localRootDir.trim();
+  const promptRoot = stripSlashes(config.localPromptsDir || defaultConfig.localPromptsDir);
+  if (!rootDir) throw new Error("Choose a local prompt folder first");
+
+  const localFiles = await invoke<LocalPromptFiles>("read_local_prompt_files", {
+    rootDir,
+    promptsDir: promptRoot,
+  });
+
+  if (!localFiles.files.length) throw new Error(`No Markdown prompts found under ${promptRoot}/`);
+
+  const manifest = localFiles.manifest ? parseYaml(localFiles.manifest) : {};
+  const prompts = localFiles.files.map(({ path, raw }) => {
+    const { meta, body } = parseFrontmatter(raw);
+    const typedMeta = meta as Record<string, unknown>;
+    return {
+      id: `local:${path}`,
+      title: String(typedMeta.title || titleFromPath(path)),
+      description: String(typedMeta.description || ""),
+      tags: normalizeList(typedMeta.tags),
+      category: String(typedMeta.category || categoryFromPath(path, promptRoot)),
+      aliases: normalizeList(typedMeta.aliases),
+      path,
+      body: body.trimEnd() + "\n",
+      source: "local" as const,
+    };
+  });
+
+  return {
+    library: {
+      name: String(manifest.name || rootDir.split(/[\\/]/).filter(Boolean).pop() || "Local prompts"),
+      version: Number(manifest.version || 1),
+      default_locale: String(manifest.default_locale || ""),
+      prompts_dir: promptRoot,
+    },
+    generated_at: new Date().toISOString(),
+    source: "local",
+    prompts,
+    errors: [],
+  };
+}
+
+async function loadPrompts(config: AppConfig): Promise<PromptIndex> {
+  return config.promptSource === "local" ? loadLocalPrompts(config) : syncPrompts(config);
 }
 
 function escapeHtml(value: string): string {
@@ -689,13 +822,15 @@ function App() {
   const [config, setConfig] = useState<AppConfig>(() => loadJson(configKey, defaultConfig));
   const [draftConfig, setDraftConfig] = useState<AppConfig>(config);
   const [localState, setLocalState] = useState<LocalState>(() => loadJson(stateKey, { prompts: {} }));
-  const [promptIndex, setPromptIndex] = useState<PromptIndex>(() => loadJson(cacheKey, fallbackIndex));
+  const [promptIndex, setPromptIndex] = useState<PromptIndex>(() => loadJson(cacheKeyForSource(config.promptSource), loadJson(cacheKey, fallbackIndex)));
   const [query, setQuery] = useState("");
   const [selectedPromptId, setSelectedPromptId] = useState<string | null>(null);
   const [status, setStatus] = useState("");
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [manualCopyText, setManualCopyText] = useState("");
   const [copiedPromptId, setCopiedPromptId] = useState<string | null>(null);
+  const [updateUrl, setUpdateUrl] = useState("");
+  const [updateTag, setUpdateTag] = useState("");
   const searchInputRef = useRef<HTMLInputElement>(null);
   const configRef = useRef(config);
   const settingsOpenRef = useRef(settingsOpen);
@@ -741,6 +876,23 @@ function App() {
     document.documentElement.dataset.theme = config.themeMode;
     document.documentElement.style.colorScheme = config.themeMode === "system" ? "light dark" : config.themeMode;
   }, [config.themeMode]);
+
+  useEffect(() => {
+    checkForUpdates(false).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    if (config.syncOnLaunch) {
+      loadPrompts(config)
+        .then((nextIndex) => {
+          setPromptIndex(nextIndex);
+          setStatus(`${config.promptSource === "local" ? "Loaded" : "Synced"} ${nextIndex.prompts.length} prompts`);
+        })
+        .catch((error) => {
+          setStatus(`${config.promptSource === "local" ? "Local load" : "Sync"} failed: ${error instanceof Error ? error.message : String(error)}`);
+        });
+    }
+  }, []);
 
   const focusSearch = useCallback(() => {
     window.setTimeout(() => {
@@ -853,8 +1005,12 @@ function App() {
   }, [localState]);
 
   useEffect(() => {
-    localStorage.setItem(cacheKey, JSON.stringify(promptIndex));
-  }, [promptIndex]);
+    localStorage.setItem(cacheKeyForSource(config.promptSource), JSON.stringify(promptIndex));
+  }, [config.promptSource, promptIndex]);
+
+  useEffect(() => {
+    setPromptIndex(loadJson(cacheKeyForSource(config.promptSource), config.promptSource === "github" ? loadJson(cacheKey, fallbackIndex) : { ...fallbackIndex, source: "local", prompts: [] }));
+  }, [config.promptSource]);
 
   useEffect(() => {
     if (!visiblePrompts.length) {
@@ -869,11 +1025,33 @@ function App() {
   async function syncNow() {
     setStatus(t.syncing);
     try {
-      const nextIndex = await syncPrompts(config);
+      const nextIndex = await loadPrompts(config);
       setPromptIndex(nextIndex);
-      setStatus(`Synced ${nextIndex.prompts.length} prompts`);
+      setStatus(`${config.promptSource === "local" ? "Loaded" : "Synced"} ${nextIndex.prompts.length} prompts`);
     } catch (error) {
-      setStatus(`Sync failed: ${error instanceof Error ? error.message : String(error)}`);
+      setStatus(`${config.promptSource === "local" ? "Local load" : "Sync"} failed: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  async function checkForUpdates(manual: boolean) {
+    if (manual) setStatus(t.checkingUpdates);
+    try {
+      const response = await fetch(latestReleaseUrl, { cache: "no-store" });
+      if (!response.ok) throw new Error(`GitHub release request returned ${response.status}`);
+      const release = await response.json();
+      const tag = String(release.tag_name || "");
+      const htmlUrl = String(release.html_url || "");
+      if (tag && compareVersions(tag, currentVersion) > 0) {
+        setUpdateUrl(htmlUrl);
+        setUpdateTag(tag);
+        setStatus(`${t.updateAvailable}: ${tag}`);
+        return;
+      }
+      setUpdateUrl("");
+      setUpdateTag("");
+      if (manual) setStatus(`${t.latestVersion}: ${currentVersion}`);
+    } catch (error) {
+      if (manual) setStatus(`Update check failed: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
@@ -923,6 +1101,8 @@ function App() {
     const nextConfig = {
       ...draftConfig,
       promptsDir: stripSlashes(draftConfig.promptsDir || defaultConfig.promptsDir),
+      localPromptsDir: stripSlashes(draftConfig.localPromptsDir || defaultConfig.localPromptsDir),
+      promptSource: draftConfig.promptSource || defaultConfig.promptSource,
       wakeShortcut: draftConfig.wakeShortcut || defaultConfig.wakeShortcut,
       themeMode: draftConfig.themeMode || defaultConfig.themeMode,
       languageMode: draftConfig.languageMode || defaultConfig.languageMode,
@@ -1028,7 +1208,12 @@ function App() {
                           {promptState.favorite ? "★" : "☆"}
                         </span>
                         <span>
-                          <span className="result-title">{highlightText(prompt.title, search)}</span>
+                          <span className="result-title">
+                            <span className={`source-icon is-${prompt.source || "bundled"}`} title={sourceLabel(prompt.source, t)}>
+                              {sourceIcon(prompt.source)}
+                            </span>
+                            {highlightText(prompt.title, search)}
+                          </span>
                           <span className="result-description">{highlightText(prompt.description, search)}</span>
                           <span className="result-tags">
                             {prompt.tags.slice(0, 3).map((tag) => (
@@ -1078,7 +1263,14 @@ function App() {
                 <span className="tag" key={tag}>#{tag}</span>
               ))}
             </div>
-            <div className="path-line">{selectedPrompt?.path}</div>
+            <div className="path-line">
+              {selectedPrompt && (
+                <span className={`source-icon is-${selectedPrompt.source || "bundled"}`} title={sourceLabel(selectedPrompt.source, t)}>
+                  {sourceIcon(selectedPrompt.source)}
+                </span>
+              )}
+              {selectedPrompt?.path}
+            </div>
             <article className="markdown" dangerouslySetInnerHTML={{ __html: selectedPrompt ? renderMarkdown(selectedPrompt.body, search) : "" }} />
           </section>
         </div>
@@ -1089,7 +1281,15 @@ function App() {
             <span><kbd>↑↓</kbd> {t.navigate}</span>
             <span><kbd>Esc</kbd> {t.clear}</span>
           </div>
-          <div className="status-text">{status || `${t.source}: ${promptIndex.library?.name || "prompt library"}`}</div>
+          <div className="status-text">
+            {updateUrl ? (
+              <button className="status-link" type="button" onClick={() => openUrl(updateUrl).catch(() => {})}>
+                {t.updateAvailable}: {updateTag}
+              </button>
+            ) : (
+              status || `${t.source}: ${promptIndex.library?.name || "prompt library"}`
+            )}
+          </div>
         </footer>
       </section>
 
@@ -1119,19 +1319,45 @@ function App() {
               <button className="icon-button" type="button" onClick={() => setSettingsOpen(false)}>×</button>
             </div>
             <label className="field">
-              <span>{t.repositoryUrl}</span>
-              <input value={draftConfig.repoUrl} onChange={(event) => setDraftConfig({ ...draftConfig, repoUrl: event.currentTarget.value })} />
+              <span>{t.sourceMode}</span>
+              <select
+                value={draftConfig.promptSource}
+                onChange={(event) => setDraftConfig({ ...draftConfig, promptSource: event.currentTarget.value as AppConfig["promptSource"] })}
+              >
+                <option value="github">GitHub</option>
+                <option value="local">{t.localSource}</option>
+              </select>
             </label>
-            <div className="field-grid">
-              <label className="field">
-                <span>{t.branch}</span>
-                <input value={draftConfig.branch} onChange={(event) => setDraftConfig({ ...draftConfig, branch: event.currentTarget.value })} />
-              </label>
-              <label className="field">
-                <span>{t.promptsDirectory}</span>
-                <input value={draftConfig.promptsDir} onChange={(event) => setDraftConfig({ ...draftConfig, promptsDir: event.currentTarget.value })} />
-              </label>
-            </div>
+            {draftConfig.promptSource === "github" && (
+              <>
+                <label className="field">
+                  <span>{t.repositoryUrl}</span>
+                  <input value={draftConfig.repoUrl} onChange={(event) => setDraftConfig({ ...draftConfig, repoUrl: event.currentTarget.value })} />
+                </label>
+                <div className="field-grid">
+                  <label className="field">
+                    <span>{t.branch}</span>
+                    <input value={draftConfig.branch} onChange={(event) => setDraftConfig({ ...draftConfig, branch: event.currentTarget.value })} />
+                  </label>
+                  <label className="field">
+                    <span>{t.promptsDirectory}</span>
+                    <input value={draftConfig.promptsDir} onChange={(event) => setDraftConfig({ ...draftConfig, promptsDir: event.currentTarget.value })} />
+                  </label>
+                </div>
+              </>
+            )}
+            {draftConfig.promptSource === "local" && (
+              <div className="field-grid">
+                <label className="field">
+                  <span>{t.localRootDirectory}</span>
+                  <input value={draftConfig.localRootDir} onChange={(event) => setDraftConfig({ ...draftConfig, localRootDir: event.currentTarget.value })} placeholder="/Users/me/prompts" />
+                </label>
+                <label className="field">
+                  <span>{t.localPromptsDirectory}</span>
+                  <input value={draftConfig.localPromptsDir} onChange={(event) => setDraftConfig({ ...draftConfig, localPromptsDir: event.currentTarget.value })} />
+                </label>
+              </div>
+            )}
             <label className="field">
               <span>{t.wakeShortcut}</span>
               <input value={draftConfig.wakeShortcut} onChange={(event) => setDraftConfig({ ...draftConfig, wakeShortcut: event.currentTarget.value })} />
@@ -1203,6 +1429,7 @@ function App() {
             </div>
             <div className="settings-actions">
               <button className="text-button" type="button" onClick={() => setDraftConfig(defaultConfig)}>{t.reset}</button>
+              <button className="text-button" type="button" onClick={() => checkForUpdates(true)}>{t.checkUpdates}</button>
               <button className="text-button" type="button" onClick={syncNow}>{t.syncNow}</button>
               <button className="text-button primary" type="submit">{t.save}</button>
             </div>

@@ -56,6 +56,8 @@ def main() -> int:
 
     lib = (DESKTOP / "src-tauri/src/lib.rs").read_text(encoding="utf-8")
     for snippet in [
+        "read_local_prompt_files",
+        "collect_markdown_files",
         "tauri::RunEvent::Reopen",
         "get_webview_window(\"main\")",
         "window.show()",
@@ -87,6 +89,8 @@ def main() -> int:
         "CommandOrControl+Shift+P",
         "@tauri-apps/plugin-global-shortcut",
         "@tauri-apps/plugin-clipboard-manager",
+        "@tauri-apps/plugin-opener",
+        "invoke<LocalPromptFiles>",
         "Wake shortcut registered",
         "Wake shortcut triggered",
         "searchInputRef.current?.focus()",
@@ -96,6 +100,14 @@ def main() -> int:
         "selectedPromptId",
         "listMode",
         "pinFavorites",
+        "promptSource",
+        "localRootDir",
+        "localPromptsDir",
+        "cacheKeyForSource",
+        "loadLocalPrompts",
+        "sourceIcon",
+        "checkForUpdates",
+        "latestReleaseUrl",
         "parseSearchQuery",
         "levenshteinDistance",
         "fuzzyIncludes",
@@ -113,6 +125,7 @@ def main() -> int:
         "hideLauncher",
         "syncPrompts",
         "https://data.jsdelivr.com/v1/package/gh/",
+        "https://api.github.com/repos/PoplarYang/prompts/releases/latest",
     ]
     for snippet in required_app_snippets:
         if snippet not in app:
@@ -138,6 +151,8 @@ def main() -> int:
         ".search-icon",
         ".mode-tabs",
         ".result-section-title",
+        ".source-icon",
+        ".status-link",
         "mark",
     ]:
         if snippet not in css:

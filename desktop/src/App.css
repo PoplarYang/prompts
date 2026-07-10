@@ -315,9 +315,38 @@ textarea {
 }
 
 .result-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   color: var(--text);
   font-size: 14px;
   font-weight: 650;
+}
+
+.source-icon {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 16px;
+  display: inline-grid;
+  place-items: center;
+  color: var(--subtle);
+  font-family: ui-sans-serif, system-ui, sans-serif;
+  font-size: 13px;
+  line-height: 1;
+  vertical-align: -2px;
+}
+
+.source-icon svg {
+  width: 15px;
+  height: 15px;
+}
+
+.source-icon.is-github {
+  color: var(--text);
+}
+
+.source-icon.is-local {
+  color: var(--accent-strong);
 }
 
 .result-description {
@@ -476,6 +505,9 @@ mark {
 
 .path-line {
   min-height: 20px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
   margin-bottom: 10px;
   color: var(--subtle);
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
@@ -526,6 +558,19 @@ mark {
   color: var(--subtle);
   font-size: 12px;
   background: var(--control);
+}
+
+.status-link {
+  border: 0;
+  padding: 0;
+  color: var(--accent-strong);
+  background: transparent;
+  font: inherit;
+  cursor: pointer;
+}
+
+.status-link:hover {
+  text-decoration: underline;
 }
 
 .keymap {

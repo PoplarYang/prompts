@@ -2,7 +2,7 @@
 
 Tauri 2 + React + TypeScript desktop app for `pp`.
 
-Current desktop version: `0.1.3`.
+Current desktop version: `0.1.4`.
 
 ## Development
 
@@ -48,6 +48,8 @@ dist/pp-desktop-macos-aarch64.dmg
 - Smart, relevance, recent, favorites, and most-used list modes
 - Favorite pinning, recent usage, and usage-count display
 - GitHub sync with jsDelivr fallback
+- Local folder prompt source with separate local cache
+- GitHub/local source indicators on prompt rows and detail metadata
 - Settings with configurable wake shortcut
 - Theme setting for system, dark, and light modes
 - Language setting for system, Chinese, and English
@@ -56,6 +58,7 @@ dist/pp-desktop-macos-aarch64.dmg
 - Tauri clipboard manager plugin
 - Tauri global shortcut plugin
 - macOS Dock/app icon reopen behavior
+- Automatic and manual update checks through GitHub Releases
 
 ## Release
 

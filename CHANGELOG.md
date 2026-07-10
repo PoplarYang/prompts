@@ -1,5 +1,12 @@
 # Changelog
 
+## Desktop 0.1.4
+
+- Added local folder prompt source for offline and private prompt libraries.
+- Kept GitHub and local prompt caches separate so the two sources do not overwrite each other.
+- Added GitHub/local source icons on prompt rows and detail metadata.
+- Added automatic update checks on app launch and a manual update check in settings.
+
 ## Desktop 0.1.3
 
 - Updated the desktop app icon with the selected bright rounded `pp` mark.
