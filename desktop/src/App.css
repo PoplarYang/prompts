@@ -1036,6 +1036,20 @@ kbd {
 
 .preview-actions {
   align-items: center;
+  gap: 8px;
+}
+
+.preview-icon-button {
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+}
+
+.preview-icon-button svg {
+  width: 18px;
+  height: 18px;
+  stroke-width: 2.3;
 }
 
 .copy-button {

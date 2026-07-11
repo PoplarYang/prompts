@@ -5,7 +5,7 @@ import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { isRegistered, register, unregister } from "@tauri-apps/plugin-global-shortcut";
 import { openPath, openUrl } from "@tauri-apps/plugin-opener";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { RefreshCw, Settings } from "lucide-react";
+import { ExternalLink, RefreshCw, Settings, Star } from "lucide-react";
 import "./App.css";
 
 type Prompt = {
@@ -1373,14 +1373,14 @@ function App() {
               </div>
               <div className="preview-actions">
                 <button
-                  className="icon-button"
+                  className="icon-button preview-icon-button"
                   type="button"
                   title={t.openOriginal}
                   aria-label={t.openOriginal}
                   disabled={!selectedPrompt || selectedPrompt.source === "bundled"}
                   onClick={openOriginalPrompt}
                 >
-                  ↗
+                  <ExternalLink aria-hidden="true" />
                 </button>
                 <button
                   className={`text-button copy-button${selectedPrompt && copiedPromptId === selectedPrompt.id ? " is-copied" : ""}`}
@@ -1391,8 +1391,8 @@ function App() {
                   <span className="copy-label">{selectedPrompt && copiedPromptId === selectedPrompt.id ? t.copied : t.copy}</span>
                   {selectedPrompt && copiedPromptId === selectedPrompt.id && <span className="copy-spark" aria-hidden="true">✓</span>}
                 </button>
-                <button className="icon-button" type="button" title={t.favorite} onClick={toggleFavorite}>
-                  {selectedPrompt && getPromptState(localState, selectedPrompt.id).favorite ? "★" : "☆"}
+                <button className="icon-button preview-icon-button" type="button" title={t.favorite} aria-label={t.favorite} onClick={toggleFavorite}>
+                  <Star aria-hidden="true" fill={selectedPrompt && getPromptState(localState, selectedPrompt.id).favorite ? "currentColor" : "none"} />
                 </button>
               </div>
             </div>
