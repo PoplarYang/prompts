@@ -863,6 +863,7 @@ function App() {
   const [copiedPromptId, setCopiedPromptId] = useState<string | null>(null);
   const [updateUrl, setUpdateUrl] = useState("");
   const [updateTag, setUpdateTag] = useState("");
+  const [toast, setToast] = useState("");
   const [installationHelp, setInstallationHelp] = useState<AppInstallationStatus | null>(null);
   const [variablePrompt, setVariablePrompt] = useState<Prompt | null>(null);
   const [variableValues, setVariableValues] = useState<Record<string, string>>({});
@@ -908,6 +909,13 @@ function App() {
   useEffect(() => {
     manualCopyTextRef.current = manualCopyText;
   }, [manualCopyText]);
+
+  useEffect(() => {
+    if (!status) return;
+    setToast(status);
+    const timer = window.setTimeout(() => setToast(""), 2600);
+    return () => window.clearTimeout(timer);
+  }, [status]);
 
   useEffect(() => {
     document.documentElement.dataset.theme = config.themeMode;
@@ -1419,8 +1427,15 @@ function App() {
               status || `${t.source}: ${promptIndex.library?.name || "prompt library"}`
             )}
           </div>
+          {status.toLowerCase().includes("failed") && (
+            <button className="status-retry" type="button" onClick={syncNow}>
+              {language === "zh-CN" ? "重试" : "Retry"}
+            </button>
+          )}
         </footer>
       </section>
+
+      {toast && <div className="toast" role="status">{toast}</div>}
 
       {manualCopyText && (
         <section className="manual-copy" onClick={() => setManualCopyText("")}>
@@ -1599,6 +1614,16 @@ function App() {
               <div>{language === "zh-CN" ? "上次同步" : "Last sync"}: {promptIndex.generated_at ? new Date(promptIndex.generated_at).toLocaleString() : (language === "zh-CN" ? "从未" : "never")}</div>
               <div>{t.source}: {promptIndex.source || "bundled"}</div>
             </div>
+            <section className="settings-about">
+              <div>
+                <strong>{language === "zh-CN" ? "关于 pp" : "About pp"}</strong>
+                <span>{language === "zh-CN" ? "轻量的个人提示词启动器" : "A lightweight personal prompt launcher"}</span>
+              </div>
+              <div className="about-actions">
+                <button className="text-button" type="button" onClick={() => openUrl("https://github.com/PoplarYang/prompts").catch(() => {})}>{language === "zh-CN" ? "打开 GitHub" : "Open GitHub"}</button>
+                <button className="text-button" type="button" onClick={() => setInstallationHelp({ is_macos: true, is_in_applications: false, executable_path: "" })}>{language === "zh-CN" ? "安装帮助" : "Install help"}</button>
+              </div>
+            </section>
             <div className="settings-actions">
               <button className="text-button" type="button" onClick={() => setDraftConfig(defaultConfig)}>{t.reset}</button>
               <button className="text-button" type="button" onClick={() => checkForUpdates(true)}>{t.checkUpdates}</button>
