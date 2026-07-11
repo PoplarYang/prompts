@@ -85,7 +85,7 @@ dist/pp-desktop-macos-x64.dmg
 
 GitHub Actions builds both macOS architectures: Apple Silicon on `macos-14` and Intel on `macos-15-intel`. The local package script produces the architecture of the current Mac.
 
-The zip is the simplest GitHub Release artifact. The DMG is a plain disk image containing `pp.app`.
+The DMG uses the standard drag-and-drop layout: `pp.app` beside an `Applications` shortcut, with `README-MACOS.txt` included for first-launch troubleshooting. The ZIP remains the fallback artifact.
 
 The current macOS artifacts are not notarized. ZIP is the recommended download: extract `pp.app`, move it to Applications, right-click it, choose Open, and confirm. If macOS still reports that it is damaged, run `xattr -cr /Applications/pp.app`. GitHub Actions verifies the ZIP contents, Mach-O executable, code signature, and DMG image integrity, but only Apple Developer ID signing and notarization can remove this manual step.
 
