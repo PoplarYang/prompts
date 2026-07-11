@@ -83,14 +83,29 @@ jobs:
     needs: [static, macos, windows]
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with:
           path: release-assets
           merge-multiple: true
+      - name: Prepare release notes
+        run: |
+          mkdir -p release-metadata
+          notes_file="docs/release-notes/${RELEASE_TAG}.md"
+          if [ -f "$notes_file" ]; then
+            cp "$notes_file" release-metadata/release-notes.md
+          else
+            {
+              echo "# pp ${RELEASE_TAG}"
+              echo
+              echo "Release notes are pending."
+            } > release-metadata/release-notes.md
+          fi
       - uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ env.RELEASE_TAG }}
           name: pp ${{ env.RELEASE_TAG }}
+          body_path: release-metadata/release-notes.md
           draft: true
           prerelease: false
           files: release-assets/*

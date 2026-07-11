@@ -127,6 +127,16 @@ The `.github/workflows/release.yml` workflow builds:
 
 The GitHub release is created as a draft so the generated assets can be inspected before publishing.
 
+## Release Notes
+
+Add bilingual release notes before pushing a version tag:
+
+```txt
+docs/release-notes/v0.1.5.md
+```
+
+The Release workflow automatically attaches `docs/release-notes/<tag>.md` to the GitHub draft release. If the file is missing, the draft is created with a short placeholder body so the notes can still be added manually before publishing.
+
 ## Desktop Smoke Test
 
 After building and packaging:
