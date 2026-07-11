@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- Refined the desktop launcher visual hierarchy, selection states, reading area, settings grouping, and responsive spacing.
+- Improved search focus, copy emphasis, status bar density, and light/dark theme surfaces.
+
 ## Desktop 0.1.6
 
 - Changed macOS distribution guidance to ZIP-first installation with manual Gatekeeper approval.

@@ -1464,6 +1464,7 @@ function App() {
               </div>
               <button className="icon-button" type="button" onClick={() => setSettingsOpen(false)}>×</button>
             </div>
+            <div className="settings-section-title">{language === "zh-CN" ? "提示词来源" : "Prompt source"}</div>
             <label className="field">
               <span>{t.sourceMode}</span>
               <select
@@ -1507,6 +1508,7 @@ function App() {
                 </label>
               </div>
             )}
+            <div className="settings-section-title">{language === "zh-CN" ? "快捷键与行为" : "Shortcut and behavior"}</div>
             <label className="field">
               <span>{t.wakeShortcut}</span>
               <input value={draftConfig.wakeShortcut} onChange={(event) => setDraftConfig({ ...draftConfig, wakeShortcut: event.currentTarget.value })} />
@@ -1548,6 +1550,7 @@ function App() {
                 </select>
               </label>
             </div>
+            <div className="settings-section-title">{language === "zh-CN" ? "运行选项" : "Runtime options"}</div>
             <label className="check-field">
               <input
                 type="checkbox"
