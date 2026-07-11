@@ -83,7 +83,7 @@ dist/pp-desktop-macos-x64.zip
 dist/pp-desktop-macos-x64.dmg
 ```
 
-GitHub Actions builds both macOS architectures: Apple Silicon on `macos-14` and Intel on `macos-13`. The local package script produces the architecture of the current Mac.
+GitHub Actions builds both macOS architectures: Apple Silicon on `macos-14` and Intel on `macos-15-intel`. The local package script produces the architecture of the current Mac.
 
 The zip is the simplest GitHub Release artifact. The DMG is a plain disk image containing `pp.app`.
 
