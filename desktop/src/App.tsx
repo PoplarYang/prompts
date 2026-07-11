@@ -5,6 +5,7 @@ import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { isRegistered, register, unregister } from "@tauri-apps/plugin-global-shortcut";
 import { openPath, openUrl } from "@tauri-apps/plugin-opener";
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import { RefreshCw, Settings } from "lucide-react";
 import "./App.css";
 
 type Prompt = {
@@ -1248,7 +1249,7 @@ function App() {
             )}
           </label>
           <button className="icon-button topbar-action sync-action" type="button" title={t.sync} aria-label={t.sync} onClick={syncNow}>
-            ↻
+            <RefreshCw aria-hidden="true" />
           </button>
           <button
             className="icon-button topbar-action settings-action"
@@ -1260,7 +1261,7 @@ function App() {
               setSettingsOpen(true);
             }}
           >
-            ⚙
+            <Settings aria-hidden="true" />
           </button>
         </header>
 

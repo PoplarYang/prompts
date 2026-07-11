@@ -97,6 +97,7 @@ def main() -> int:
         "@tauri-apps/plugin-global-shortcut",
         "@tauri-apps/plugin-clipboard-manager",
         "@tauri-apps/plugin-opener",
+        "lucide-react",
         "@tauri-apps/plugin-dialog",
         "invoke<LocalPromptFiles>",
         "Wake shortcut registered",

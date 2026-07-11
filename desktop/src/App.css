@@ -175,14 +175,18 @@ textarea {
   line-height: 1;
 }
 
+.topbar-action svg {
+  width: 25px;
+  height: 25px;
+  stroke-width: 2.4;
+}
+
 .sync-action {
-  font-size: 27px !important;
-  font-weight: 500 !important;
+  font-size: 0 !important;
 }
 
 .settings-action {
-  font-size: 27px !important;
-  font-weight: 700 !important;
+  font-size: 0 !important;
 }
 
 .topbar-action:focus-visible,
