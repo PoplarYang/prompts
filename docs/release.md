@@ -1,6 +1,6 @@
 # Release Guide
 
-`pp` is released as static web artifacts plus desktop packages. macOS distribution is blocked until Developer ID signing and notarization are configured.
+`pp` is released as static web artifacts plus desktop packages. Until Developer ID signing and notarization are configured, macOS ZIP is the primary distribution format and requires one manual Gatekeeper approval.
 
 ## Build
 
@@ -87,7 +87,7 @@ GitHub Actions builds both macOS architectures: Apple Silicon on `macos-14` and 
 
 The zip is the simplest GitHub Release artifact. The DMG is a plain disk image containing `pp.app`.
 
-The current macOS artifacts are ad-hoc signed and not notarized. GitHub Actions now extracts the ZIP, verifies the Mach-O executable, verifies the code signature, and mounts the DMG before upload. This catches corrupt packages, but it cannot make an unsigned app trusted by macOS. Configure `APPLE_CERTIFICATE`, `APPLE_CERTIFICATE_PASSWORD`, `APPLE_SIGNING_IDENTITY`, `APPLE_ID`, `APPLE_PASSWORD`, and `APPLE_TEAM_ID` before publishing to remove the “app is damaged” warning for downloaded builds.
+The current macOS artifacts are not notarized. ZIP is the recommended download: extract `pp.app`, move it to Applications, right-click it, choose Open, and confirm. If macOS still reports that it is damaged, run `xattr -cr /Applications/pp.app`. GitHub Actions verifies the ZIP and DMG contents, but only Apple Developer ID signing and notarization can remove this manual step.
 
 ## Windows Desktop
 

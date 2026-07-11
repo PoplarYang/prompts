@@ -110,7 +110,7 @@ const defaultConfig: AppConfig = {
   fillVariablesBeforeCopy: false,
 };
 
-const currentVersion = "0.1.5";
+const currentVersion = "0.1.6";
 const latestReleaseUrl = "https://api.github.com/repos/PoplarYang/prompts/releases/latest";
 
 const messages = {

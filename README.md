@@ -110,7 +110,18 @@ dist/pp-desktop-macos-<arch>.zip
 dist/pp-desktop-macos-<arch>.dmg
 ```
 
-The current desktop artifacts are unsigned and not notarized, so macOS may show a security prompt when opening them outside this development machine.
+### macOS ZIP 安装
+
+ZIP 是当前 macOS 的推荐下载格式。下载与你的 Mac 对应的版本，解压后将 `pp.app` 拖入“应用程序”，然后右键点击 `pp.app`，选择“打开”并确认。
+
+如果系统仍提示“应用已损坏”，执行：
+
+```sh
+xattr -cr /Applications/pp.app
+open /Applications/pp.app
+```
+
+当前版本未使用 Apple Developer ID 签名和 notarization，因此首次启动需要手动允许。
 
 Windows packages are built in GitHub Actions with:
 

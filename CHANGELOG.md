@@ -1,5 +1,11 @@
 # Changelog
 
+## Desktop 0.1.6
+
+- Changed macOS distribution guidance to ZIP-first installation with manual Gatekeeper approval.
+- Added separate Apple Silicon and Intel macOS release artifacts.
+- Added local and GitHub Actions package integrity checks.
+
 ## Desktop 0.1.5
 
 - Added optional variable filling before copying prompts.
