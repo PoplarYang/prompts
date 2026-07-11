@@ -7,7 +7,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .plugin(tauri_plugin_clipboard_manager::init())
-        .invoke_handler(tauri::generate_handler![read_local_prompt_files])
+        .invoke_handler(tauri::generate_handler![read_local_prompt_files, app_installation_status])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
         .run(|app, event| {
@@ -22,6 +22,24 @@ pub fn run() {
                 }
             }
         });
+}
+
+#[derive(serde::Serialize)]
+struct AppInstallationStatus {
+    is_macos: bool,
+    is_in_applications: bool,
+    executable_path: String,
+}
+
+#[tauri::command]
+fn app_installation_status() -> AppInstallationStatus {
+    let executable = std::env::current_exe().unwrap_or_default();
+    let path = executable.to_string_lossy().to_string();
+    AppInstallationStatus {
+        is_macos: cfg!(target_os = "macos"),
+        is_in_applications: cfg!(target_os = "macos") && path.contains("/Applications/"),
+        executable_path: path,
+    }
 }
 
 #[derive(serde::Serialize)]

@@ -58,6 +58,7 @@ def main() -> int:
     lib = (DESKTOP / "src-tauri/src/lib.rs").read_text(encoding="utf-8")
     for snippet in [
         "read_local_prompt_files",
+        "app_installation_status",
         "collect_markdown_files",
         "tauri::RunEvent::Reopen",
         "get_webview_window(\"main\")",

@@ -620,6 +620,32 @@ kbd {
   background: var(--panel);
 }
 
+.installation-help {
+  max-width: 620px;
+}
+
+.installation-steps {
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.installation-steps code {
+  display: block;
+  padding: 10px 12px;
+  color: var(--code-text);
+  background: var(--code-bg);
+  border: 1px solid var(--line-soft);
+  border-radius: 6px;
+  overflow-wrap: anywhere;
+}
+
+.modal-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 16px;
+}
+
 .manual-copy-panel {
   grid-template-rows: auto minmax(260px, 1fr);
   max-height: min(620px, calc(100vh - 36px));

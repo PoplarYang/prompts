@@ -19,6 +19,12 @@ type Prompt = {
   source?: "github" | "local" | "bundled";
 };
 
+type AppInstallationStatus = {
+  is_macos: boolean;
+  is_in_applications: boolean;
+  executable_path: string;
+};
+
 type PromptIndex = {
   library?: {
     name?: string;
@@ -857,6 +863,7 @@ function App() {
   const [copiedPromptId, setCopiedPromptId] = useState<string | null>(null);
   const [updateUrl, setUpdateUrl] = useState("");
   const [updateTag, setUpdateTag] = useState("");
+  const [installationHelp, setInstallationHelp] = useState<AppInstallationStatus | null>(null);
   const [variablePrompt, setVariablePrompt] = useState<Prompt | null>(null);
   const [variableValues, setVariableValues] = useState<Record<string, string>>({});
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -909,6 +916,16 @@ function App() {
 
   useEffect(() => {
     checkForUpdates(false).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    invoke<AppInstallationStatus>("app_installation_status")
+      .then((result) => {
+        if (result.is_macos && !result.is_in_applications && !localStorage.getItem("pp-installation-help-seen")) {
+          setInstallationHelp(result);
+        }
+      })
+      .catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -1408,6 +1425,31 @@ function App() {
               <button className="icon-button" type="button" onClick={() => setManualCopyText("")}>×</button>
             </div>
             <textarea value={manualCopyText} readOnly spellCheck={false} autoFocus />
+          </div>
+        </section>
+      )}
+
+      {installationHelp && (
+        <section className="manual-copy" onClick={() => setInstallationHelp(null)}>
+          <div className="manual-copy-panel installation-help" onClick={(event) => event.stopPropagation()}>
+            <div className="manual-copy-head">
+              <div>
+                <h2>完成 pp 安装</h2>
+                <p>建议将 pp 放入“应用程序”文件夹，以确保快捷键和后续启动稳定工作。</p>
+              </div>
+              <button className="icon-button" type="button" onClick={() => { localStorage.setItem("pp-installation-help-seen", "1"); setInstallationHelp(null); }}>×</button>
+            </div>
+            <div className="installation-steps">
+              <p>1. 将 pp.app 移动到“应用程序”。</p>
+              <p>2. 如果 macOS 阻止启动，请前往“系统设置 → 隐私与安全性”。</p>
+              <p>3. 如果仍无法打开，在终端执行：</p>
+              <code>xattr -cr /Applications/pp.app && open /Applications/pp.app</code>
+            </div>
+            <div className="modal-actions">
+              <button className="text-button" type="button" onClick={() => openPath("/Applications").catch(() => {})}>打开 Applications</button>
+              <button className="text-button" type="button" onClick={() => openUrl("x-apple.systempreferences:com.apple.settings.PrivacySecurity.extension").catch(() => {})}>打开隐私与安全性</button>
+              <button className="text-button" type="button" onClick={() => navigator.clipboard?.writeText("xattr -cr /Applications/pp.app && open /Applications/pp.app")}>复制处理命令</button>
+            </div>
           </div>
         </section>
       )}
