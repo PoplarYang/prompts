@@ -594,12 +594,35 @@ mark {
 }
 
 .markdown pre {
+  position: relative;
   overflow: auto;
   margin: 12px 0 18px;
   padding: 13px 14px;
   border: 1px solid var(--line-soft);
   border-radius: 7px;
   background: var(--code-bg);
+}
+
+.code-copy {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 1;
+  min-width: 48px;
+  padding: 4px 8px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  color: var(--muted);
+  background: var(--panel);
+  font-size: 10px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.code-copy:hover,
+.code-copy.is-copied {
+  color: var(--accent-strong);
+  border-color: var(--accent);
 }
 
 .markdown code {

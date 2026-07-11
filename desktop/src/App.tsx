@@ -798,7 +798,7 @@ function escapeHtml(value: string): string {
     .replace(/'/g, "&#039;");
 }
 
-function renderMarkdown(markdown: string, search: SearchQuery): string {
+function renderMarkdown(markdown: string, search: SearchQuery, copiedCodeIndex: number | null = null): string {
   const codeBlocks: Array<{ lang: string; code: string }> = [];
   let html = markdown.replace(/```(\w+)?\n([\s\S]*?)```/g, (_, lang = "", code) => {
     const token = `@@CODE_${codeBlocks.length}@@`;
@@ -828,7 +828,8 @@ function renderMarkdown(markdown: string, search: SearchQuery): string {
       const index = Number(line.trim().match(/\d+/)![0]);
       const block = codeBlocks[index];
       const code = highlightEscapedHtml(escapeHtml(block.code.trim()), search);
-      segments.push(`<pre><code data-lang="${escapeHtml(block.lang)}">${code}</code></pre>`);
+      const copyLabel = copiedCodeIndex === index ? "Copied" : "Copy";
+      segments.push(`<pre><button class="code-copy${copiedCodeIndex === index ? " is-copied" : ""}" type="button" data-code-index="${index}" aria-label="Copy code">${copyLabel}</button><code data-lang="${escapeHtml(block.lang)}">${code}</code></pre>`);
       return;
     }
     const unordered = line.match(/^- (.*)$/);
@@ -865,6 +866,7 @@ function App() {
   const [updateUrl, setUpdateUrl] = useState("");
   const [updateTag, setUpdateTag] = useState("");
   const [toast, setToast] = useState("");
+  const [copiedCodeIndex, setCopiedCodeIndex] = useState<number | null>(null);
   const [installationHelp, setInstallationHelp] = useState<AppInstallationStatus | null>(null);
   const [variablePrompt, setVariablePrompt] = useState<Prompt | null>(null);
   const [variableValues, setVariableValues] = useState<Record<string, string>>({});
@@ -872,6 +874,7 @@ function App() {
   const configRef = useRef(config);
   const settingsOpenRef = useRef(settingsOpen);
   const manualCopyTextRef = useRef(manualCopyText);
+  const markdownRef = useRef<HTMLElement>(null);
   const language = resolveLanguage(config.languageMode);
   const t = messages[language];
   const search = useMemo(() => parseSearchQuery(query), [query]);
@@ -917,6 +920,28 @@ function App() {
     const timer = window.setTimeout(() => setToast(""), 2600);
     return () => window.clearTimeout(timer);
   }, [status]);
+
+  useEffect(() => {
+    setCopiedCodeIndex(null);
+    const article = markdownRef.current;
+    if (!article) return;
+
+    const handleCodeCopy = (event: Event) => {
+      const target = event.target as HTMLElement;
+      const button = target.closest<HTMLButtonElement>(".code-copy");
+      if (!button) return;
+      const code = button.parentElement?.querySelector("code")?.textContent ?? "";
+      writeText(code).then(() => {
+        const index = Number(button.dataset.codeIndex);
+        setCopiedCodeIndex(index);
+        setStatus(t.copied);
+        window.setTimeout(() => setCopiedCodeIndex(null), 1400);
+      }).catch(() => setStatus(t.clipboardBlocked));
+    };
+
+    article.addEventListener("click", handleCodeCopy);
+    return () => article.removeEventListener("click", handleCodeCopy);
+  }, [selectedPrompt?.id, t.copied, t.clipboardBlocked]);
 
   useEffect(() => {
     document.documentElement.dataset.theme = config.themeMode;
@@ -1409,7 +1434,11 @@ function App() {
               )}
               {selectedPrompt?.path}
             </div>
-            <article className="markdown" dangerouslySetInnerHTML={{ __html: selectedPrompt ? renderMarkdown(selectedPrompt.body, search) : "" }} />
+            <article
+              ref={markdownRef}
+              className="markdown"
+              dangerouslySetInnerHTML={{ __html: selectedPrompt ? renderMarkdown(selectedPrompt.body, search, copiedCodeIndex) : "" }}
+            />
           </section>
         </div>
 
