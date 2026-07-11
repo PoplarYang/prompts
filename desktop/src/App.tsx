@@ -1235,6 +1235,9 @@ function App() {
                 if (event.key === "Escape") setQuery("");
               }}
             />
+            {query && (
+              <button className="search-clear" type="button" aria-label={language === "zh-CN" ? "清除搜索" : "Clear search"} onClick={() => setQuery("")}>×</button>
+            )}
           </label>
           <button className="icon-button" type="button" title={t.sync} aria-label={t.sync} onClick={syncNow}>
             ↻
@@ -1327,7 +1330,7 @@ function App() {
                           </span>
                           <span className="result-description">{highlightText(prompt.description, search)}</span>
                           <span className="result-tags">
-                            {prompt.tags.slice(0, 3).map((tag) => (
+                            {prompt.tags.slice(0, 2).map((tag) => (
                               <span className="tag" key={tag}>#{highlightText(tag, search)}</span>
                             ))}
                           </span>
@@ -1343,7 +1346,12 @@ function App() {
                 </section>
               ))}
               {!visiblePrompts.length && (
-                <div className="empty-results">{t.noPromptSelected}</div>
+                <div className="empty-results">
+                  <span className="empty-icon">⌕</span>
+                  <strong>{query.trim() ? (language === "zh-CN" ? "没有匹配的提示词" : "No matching prompts") : t.noPromptSelected}</strong>
+                  <span>{query.trim() ? (language === "zh-CN" ? "试试更短的关键词，或清除搜索条件。" : "Try a shorter search or clear the filter.") : (language === "zh-CN" ? "同步仓库或选择一个本地提示词文件夹。" : "Sync a repository or choose a local prompt folder.")}</span>
+                  {query.trim() && <button className="text-button" type="button" onClick={() => setQuery("")}>{language === "zh-CN" ? "清除搜索" : "Clear search"}</button>}
+                </div>
               )}
             </div>
           </aside>
