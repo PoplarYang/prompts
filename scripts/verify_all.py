@@ -14,6 +14,7 @@ ROOT = Path(__file__).resolve().parents[1]
 COMMANDS = [
     ["python3", "scripts/build_prompt_index.py"],
     ["python3", "tests/test_prompt_index.py"],
+    ["python3", "tests/test_release_artifacts.py"],
     ["python3", "scripts/verify_v0_1.py"],
     ["python3", "scripts/verify_v0_2.py"],
     ["python3", "scripts/verify_v1_0.py"],

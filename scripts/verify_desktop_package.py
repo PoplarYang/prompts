@@ -4,6 +4,9 @@
 from __future__ import annotations
 
 import plistlib
+import shutil
+import subprocess
+import tempfile
 import zipfile
 from pathlib import Path
 
@@ -16,6 +19,38 @@ DIST = ROOT / "dist"
 def fail(message: str) -> int:
     print(f"FAIL: {message}")
     return 1
+
+
+def verify_zip(artifact: Path) -> None:
+    with zipfile.ZipFile(artifact) as archive:
+        if archive.testzip() is not None:
+            raise ValueError("Desktop zip contains a corrupt file")
+        names = set(archive.namelist())
+        required = {
+            "pp.app/Contents/MacOS/pp",
+            "pp.app/Contents/Info.plist",
+            "pp.app/Contents/Resources/icon.icns",
+        }
+        missing = required - names
+        if missing:
+            raise ValueError(f"Desktop zip is missing: {', '.join(sorted(missing))}")
+        executable_entry = archive.getinfo("pp.app/Contents/MacOS/pp")
+        if ((executable_entry.external_attr >> 16) & 0o111) == 0:
+            raise ValueError("Desktop zip does not preserve executable permissions")
+
+        with tempfile.TemporaryDirectory(prefix="pp-verify-") as directory:
+            root = Path(directory)
+            archive.extractall(root)
+            extracted_app = root / "pp.app"
+            extracted_executable = extracted_app / "Contents/MacOS/pp"
+            with (extracted_app / "Contents/Info.plist").open("rb") as file:
+                extracted_info = plistlib.load(file)
+            if extracted_info.get("CFBundleIdentifier") != "com.poplaryang.pp":
+                raise ValueError("Extracted app has an unexpected bundle identifier")
+            if shutil.which("file"):
+                result = subprocess.run(["file", str(extracted_executable)], capture_output=True, text=True)
+                if result.returncode != 0 or "Mach-O" not in result.stdout:
+                    raise ValueError("Extracted pp executable is not a Mach-O binary")
 
 
 def main() -> int:
@@ -49,12 +84,10 @@ def main() -> int:
     if dmg_artifact.stat().st_size < 1_000_000:
         return fail("Desktop DMG is unexpectedly small")
 
-    with zipfile.ZipFile(zip_artifact) as archive:
-        names = set(archive.namelist())
-    if "pp.app/Contents/MacOS/pp" not in names:
-        return fail("Desktop zip does not contain pp.app executable")
-    if "pp.app/Contents/Info.plist" not in names:
-        return fail("Desktop zip does not contain Info.plist")
+    try:
+        verify_zip(zip_artifact)
+    except (OSError, ValueError, zipfile.BadZipFile) as error:
+        return fail(str(error))
 
     print("OK: verified pp desktop distribution artifacts")
     return 0

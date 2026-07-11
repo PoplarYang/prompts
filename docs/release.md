@@ -1,6 +1,6 @@
 # Release Guide
 
-`pp` is released as static web artifacts plus unsigned desktop packages.
+`pp` is released as static web artifacts plus desktop packages. macOS distribution is blocked until Developer ID signing and notarization are configured.
 
 ## Build
 
@@ -69,19 +69,25 @@ npm run tauri build -- --bundles app
 cd ..
 python3 scripts/package_desktop.py
 python3 scripts/verify_desktop_package.py
+# Windows CI equivalent:
+python3 scripts/verify_windows_package.py path/to/pp-setup.exe
 ```
 
 Outputs:
 
 ```txt
 desktop/src-tauri/target/release/bundle/macos/pp.app
-dist/pp-desktop-macos-<arch>.zip
-dist/pp-desktop-macos-<arch>.dmg
+dist/pp-desktop-macos-aarch64.zip
+dist/pp-desktop-macos-aarch64.dmg
+dist/pp-desktop-macos-x64.zip
+dist/pp-desktop-macos-x64.dmg
 ```
+
+GitHub Actions builds both macOS architectures: Apple Silicon on `macos-14` and Intel on `macos-13`. The local package script produces the architecture of the current Mac.
 
 The zip is the simplest GitHub Release artifact. The DMG is a plain disk image containing `pp.app`.
 
-The current macOS artifacts are unsigned and not notarized. For public distribution, add Apple Developer ID signing, notarization, and a signed DMG release step.
+The current macOS artifacts are ad-hoc signed and not notarized. GitHub Actions now extracts the ZIP, verifies the Mach-O executable, verifies the code signature, and mounts the DMG before upload. This catches corrupt packages, but it cannot make an unsigned app trusted by macOS. Configure `APPLE_CERTIFICATE`, `APPLE_CERTIFICATE_PASSWORD`, `APPLE_SIGNING_IDENTITY`, `APPLE_ID`, `APPLE_PASSWORD`, and `APPLE_TEAM_ID` before publishing to remove the “app is damaged” warning for downloaded builds.
 
 ## Windows Desktop
 
