@@ -59,6 +59,22 @@ jobs:
         working-directory: desktop
       - run: python3 scripts/package_desktop.py
       - run: python3 scripts/verify_desktop_package.py
+      - name: Verify macOS DMG installation layout
+        run: |
+          set -euo pipefail
+          mountpoint=$(mktemp -d)
+          device=""
+          cleanup() {
+            if [ -n "$device" ]; then hdiutil detach "$device" -force || true; fi
+            rmdir "$mountpoint" 2>/dev/null || true
+          }
+          trap cleanup EXIT
+          device=$(hdiutil attach -nobrowse -readonly -nomount -plist dist/pp-desktop-macos-${{ matrix.arch }}.dmg | /usr/libexec/PlistBuddy -c 'Print :system-entities:0:dev-entry' /dev/stdin)
+          hdiutil attach -nobrowse -readonly -mountpoint "$mountpoint" dist/pp-desktop-macos-${{ matrix.arch }}.dmg >/dev/null
+          test -d "$mountpoint/pp.app"
+          test -L "$mountpoint/Applications"
+          test -f "$mountpoint/README-MACOS.txt"
+          grep -q "xattr -cr /Applications/pp.app" "$mountpoint/README-MACOS.txt"
       - uses: actions/upload-artifact@v4
         with:
           name: pp-desktop-macos-${{ matrix.arch }}
