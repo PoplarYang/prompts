@@ -189,6 +189,14 @@ textarea {
   font-size: 0 !important;
 }
 
+.sync-action.is-syncing svg {
+  animation: sync-spin 900ms linear infinite;
+}
+
+@keyframes sync-spin {
+  to { transform: rotate(360deg); }
+}
+
 .topbar-action:focus-visible,
 .search-clear:focus-visible,
 .icon-button:focus-visible,
@@ -286,6 +294,16 @@ textarea {
   color: var(--text);
   border-color: var(--line);
   background: var(--control);
+}
+
+.source-tabs {
+  height: 38px;
+  padding: 4px 8px;
+}
+
+.source-tabs .mode-tab {
+  min-height: 29px;
+  font-size: 11px;
 }
 
 .results {

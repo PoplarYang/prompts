@@ -1248,7 +1248,7 @@ function App() {
               <button className="search-clear" type="button" aria-label={language === "zh-CN" ? "清除搜索" : "Clear search"} onClick={() => setQuery("")}>×</button>
             )}
           </label>
-          <button className="icon-button topbar-action sync-action" type="button" title={t.sync} aria-label={t.sync} onClick={syncNow}>
+          <button className={`icon-button topbar-action sync-action${status === t.syncing ? " is-syncing" : ""}`} type="button" title={t.sync} aria-label={t.sync} onClick={syncNow}>
             <RefreshCw aria-hidden="true" />
           </button>
           <button
