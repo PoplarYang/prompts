@@ -65,10 +65,7 @@ jobs:
           ditto -x -k dist/pp-desktop-macos-*.zip "$tmpdir"
           test -x "$tmpdir/pp.app/Contents/MacOS/pp"
           codesign --verify --deep --strict --verbose=2 "$tmpdir/pp.app"
-          mkdir -p "$tmpdir/mount"
-          hdiutil attach -nobrowse -readonly dist/pp-desktop-macos-*.dmg -mountpoint "$tmpdir/mount"
-          test -x "$tmpdir/mount/pp.app/Contents/MacOS/pp"
-          hdiutil detach "$tmpdir/mount"
+          hdiutil verify dist/pp-desktop-macos-*.dmg
       - uses: actions/upload-artifact@v4
         with:
           name: pp-desktop-macos-${{ matrix.arch }}
