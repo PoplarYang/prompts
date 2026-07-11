@@ -63,13 +63,11 @@ jobs:
         run: |
           set -euo pipefail
           mountpoint=$(mktemp -d)
-          device=""
           cleanup() {
-            if [ -n "$device" ]; then hdiutil detach "$device" -force || true; fi
+            hdiutil detach "$mountpoint" -force >/dev/null 2>&1 || true
             rmdir "$mountpoint" 2>/dev/null || true
           }
           trap cleanup EXIT
-          device=$(hdiutil attach -nobrowse -readonly -nomount -plist dist/pp-desktop-macos-${{ matrix.arch }}.dmg | /usr/libexec/PlistBuddy -c 'Print :system-entities:0:dev-entry' /dev/stdin)
           hdiutil attach -nobrowse -readonly -mountpoint "$mountpoint" dist/pp-desktop-macos-${{ matrix.arch }}.dmg >/dev/null
           test -d "$mountpoint/pp.app"
           test -L "$mountpoint/Applications"
