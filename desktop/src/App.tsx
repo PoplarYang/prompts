@@ -1592,6 +1592,10 @@ function App() {
               <span>{t.fillVariablesBeforeCopy}</span>
             </label>
             <div className="settings-meta">
+              <div className="settings-version-row">
+                <span>{language === "zh-CN" ? "当前版本" : "Current version"}</span>
+                <code>v{currentVersion}</code>
+              </div>
               <div>{language === "zh-CN" ? "上次同步" : "Last sync"}: {promptIndex.generated_at ? new Date(promptIndex.generated_at).toLocaleString() : (language === "zh-CN" ? "从未" : "never")}</div>
               <div>{t.source}: {promptIndex.source || "bundled"}</div>
             </div>

@@ -138,6 +138,8 @@ def main() -> int:
         "pp-installation-help-seen",
         "x-apple.systempreferences:com.apple.settings.PrivacySecurity.extension",
         "xattr -cr /Applications/pp.app",
+        "Current version",
+        "currentVersion",
         "settingsOpenRef.current",
         "copy-spark",
         "hideLauncher",

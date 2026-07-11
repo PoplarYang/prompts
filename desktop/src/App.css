@@ -766,6 +766,25 @@ kbd {
   font-size: 12px;
 }
 
+.settings-version-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: var(--text);
+  font-weight: 650;
+}
+
+.settings-version-row code {
+  padding: 3px 7px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  color: var(--muted);
+  background: var(--control);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 11px;
+  font-weight: 600;
+}
+
 .settings-actions {
   display: flex;
   justify-content: flex-end;
