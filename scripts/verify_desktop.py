@@ -28,6 +28,7 @@ def main() -> int:
         "src-tauri/src/main.rs",
         "src-tauri/tauri.conf.json",
         "src-tauri/capabilities/default.json",
+        "src-tauri/icons/icon-source.svg",
     ]
     for relative in required_files:
         if not (DESKTOP / relative).exists():
@@ -90,6 +91,7 @@ def main() -> int:
         "@tauri-apps/plugin-global-shortcut",
         "@tauri-apps/plugin-clipboard-manager",
         "@tauri-apps/plugin-opener",
+        "@tauri-apps/plugin-dialog",
         "invoke<LocalPromptFiles>",
         "Wake shortcut registered",
         "Wake shortcut triggered",
@@ -103,6 +105,13 @@ def main() -> int:
         "promptSource",
         "localRootDir",
         "localPromptsDir",
+        "sourceFilter",
+        "fillVariablesBeforeCopy",
+        "extractPromptVariables",
+        "fillPromptVariables",
+        "openDialog",
+        "openOriginalPrompt",
+        "openPath",
         "cacheKeyForSource",
         "loadLocalPrompts",
         "sourceIcon",
@@ -153,10 +162,25 @@ def main() -> int:
         ".result-section-title",
         ".source-icon",
         ".status-link",
+        ".source-tabs",
+        ".variable-panel",
         "mark",
     ]:
         if snippet not in css:
             return fail(f"Missing desktop CSS behavior: {snippet}")
+
+    template_demo = ROOT / "prototype" / "local-template-demo.html"
+    if not template_demo.exists():
+        return fail("Missing local prompt template demo")
+    template = template_demo.read_text(encoding="utf-8")
+    for snippet in [
+        "pp 本地提示词模板 Demo",
+        "生成 Markdown",
+        "校验",
+        "{{error}}",
+    ]:
+        if snippet not in template:
+            return fail(f"Missing local template demo behavior: {snippet}")
 
     print("OK: verified pp desktop Tauri source artifacts")
     return 0

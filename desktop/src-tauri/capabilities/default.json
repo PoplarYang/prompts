@@ -12,6 +12,8 @@
     "core:window:allow-show",
     "core:window:allow-unminimize",
     "opener:default",
+    "dialog:default",
+    "dialog:allow-open",
     "global-shortcut:default",
     "global-shortcut:allow-is-registered",
     "global-shortcut:allow-register",

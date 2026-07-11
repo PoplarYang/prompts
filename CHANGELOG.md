@@ -1,5 +1,13 @@
 # Changelog
 
+## Desktop 0.1.5
+
+- Added optional variable filling before copying prompts.
+- Added source filtering for all, GitHub, and local prompts.
+- Added a local folder chooser for local prompt libraries.
+- Added one-click open for original GitHub Markdown pages or local Markdown files.
+- Added a local prompt template demo for generating and validating prompt Markdown.
+
 ## Desktop 0.1.4
 
 - Added local folder prompt source for offline and private prompt libraries.

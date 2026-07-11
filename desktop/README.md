@@ -2,7 +2,7 @@
 
 Tauri 2 + React + TypeScript desktop app for `pp`.
 
-Current desktop version: `0.1.4`.
+Current desktop version: `0.1.5`.
 
 ## Development
 
@@ -50,6 +50,9 @@ dist/pp-desktop-macos-aarch64.dmg
 - GitHub sync with jsDelivr fallback
 - Local folder prompt source with separate local cache
 - GitHub/local source indicators on prompt rows and detail metadata
+- Source filters for all, GitHub, and local prompts
+- Optional variable filling before copy for `{{variable}}` placeholders
+- One-click open for original GitHub Markdown pages or local Markdown files
 - Settings with configurable wake shortcut
 - Theme setting for system, dark, and light modes
 - Language setting for system, Chinese, and English

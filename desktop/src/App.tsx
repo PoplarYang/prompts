@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { invoke } from "@tauri-apps/api/core";
+import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { isRegistered, register, unregister } from "@tauri-apps/plugin-global-shortcut";
-import { openUrl } from "@tauri-apps/plugin-opener";
+import { openPath, openUrl } from "@tauri-apps/plugin-opener";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import "./App.css";
 
@@ -46,7 +47,9 @@ type AppConfig = {
   languageMode: "system" | "zh-CN" | "en-US";
   alwaysOnTop: boolean;
   listMode: "smart" | "relevance" | "recent" | "favorites" | "used";
+  sourceFilter: "all" | "github" | "local";
   pinFavorites: boolean;
+  fillVariablesBeforeCopy: boolean;
 };
 
 type PromptState = {
@@ -102,10 +105,12 @@ const defaultConfig: AppConfig = {
   languageMode: "system",
   alwaysOnTop: true,
   listMode: "smart",
+  sourceFilter: "all",
   pinFavorites: true,
+  fillVariablesBeforeCopy: false,
 };
 
-const currentVersion = "0.1.4";
+const currentVersion = "0.1.5";
 const latestReleaseUrl = "https://api.github.com/repos/PoplarYang/prompts/releases/latest";
 
 const messages = {
@@ -118,6 +123,7 @@ const messages = {
     copy: "Copy",
     copyPrompt: "Copy prompt",
     copied: "Copied",
+    choose: "Choose",
     dark: "Dark",
     favorite: "Favorite",
     followSystem: "Follow system",
@@ -133,6 +139,7 @@ const messages = {
     navigate: "Navigate",
     noPromptSelected: "No prompt selected",
     pinFavorites: "Pin favorites",
+    fillVariablesBeforeCopy: "Fill variables before copy",
     prompts: "prompts",
     promptsDirectory: "Prompts directory",
     ready: "Ready",
@@ -148,6 +155,7 @@ const messages = {
     showRelevance: "Relevance",
     showSmart: "Smart",
     showUsed: "Used",
+    showAllSources: "All",
     source: "Source",
     sourceMode: "Prompt source",
     sync: "Sync",
@@ -159,6 +167,7 @@ const messages = {
     checkUpdates: "Check updates",
     checkingUpdates: "Checking updates...",
     latestVersion: "You are on the latest version",
+    openOriginal: "Open original",
     wakeShortcut: "Wake shortcut",
   },
   "zh-CN": {
@@ -170,6 +179,7 @@ const messages = {
     copy: "复制",
     copyPrompt: "复制提示词",
     copied: "已复制",
+    choose: "选择",
     dark: "深色",
     favorite: "收藏",
     followSystem: "跟随系统",
@@ -185,6 +195,7 @@ const messages = {
     navigate: "导航",
     noPromptSelected: "未选择提示词",
     pinFavorites: "收藏置顶",
+    fillVariablesBeforeCopy: "复制前填写变量",
     prompts: "条提示词",
     promptsDirectory: "提示词目录",
     ready: "就绪",
@@ -200,6 +211,7 @@ const messages = {
     showRelevance: "相关",
     showSmart: "智能",
     showUsed: "常用",
+    showAllSources: "全部",
     source: "来源",
     sourceMode: "提示词来源",
     sync: "同步",
@@ -211,6 +223,7 @@ const messages = {
     checkUpdates: "检查更新",
     checkingUpdates: "正在检查更新...",
     latestVersion: "已是最新版本",
+    openOriginal: "打开原文件",
     wakeShortcut: "唤醒快捷键",
   },
 } as const;
@@ -316,6 +329,19 @@ function compareVersions(a: string, b: string): number {
     if (diff) return diff;
   }
   return 0;
+}
+
+function extractPromptVariables(body: string): string[] {
+  const variables = new Set<string>();
+  body.replace(/\{\{\s*([a-zA-Z_][\w.-]*)\s*\}\}/g, (_, name: string) => {
+    variables.add(name);
+    return "";
+  });
+  return [...variables];
+}
+
+function fillPromptVariables(body: string, values: Record<string, string>): string {
+  return body.replace(/\{\{\s*([a-zA-Z_][\w.-]*)\s*\}\}/g, (_, name: string) => values[name] ?? "");
 }
 
 function sourceIcon(source?: Prompt["source"]) {
@@ -831,6 +857,8 @@ function App() {
   const [copiedPromptId, setCopiedPromptId] = useState<string | null>(null);
   const [updateUrl, setUpdateUrl] = useState("");
   const [updateTag, setUpdateTag] = useState("");
+  const [variablePrompt, setVariablePrompt] = useState<Prompt | null>(null);
+  const [variableValues, setVariableValues] = useState<Record<string, string>>({});
   const searchInputRef = useRef<HTMLInputElement>(null);
   const configRef = useRef(config);
   const settingsOpenRef = useRef(settingsOpen);
@@ -838,16 +866,18 @@ function App() {
   const language = resolveLanguage(config.languageMode);
   const t = messages[language];
   const search = useMemo(() => parseSearchQuery(query), [query]);
+  const variableNames = useMemo(() => extractPromptVariables(variablePrompt?.body || ""), [variablePrompt]);
 
   const scoredPrompts = useMemo(() => {
     return promptIndex.prompts
+      .filter((prompt) => config.sourceFilter === "all" || prompt.source === config.sourceFilter)
       .map((prompt) => ({
         prompt,
         local: getPromptState(localState, prompt.id),
         score: scorePrompt(prompt, search, getPromptState(localState, prompt.id)),
       }))
       .filter(({ score }) => score > 0);
-  }, [localState, promptIndex, search]);
+  }, [config.sourceFilter, localState, promptIndex, search]);
 
   const promptSections = useMemo(() => buildSections(scoredPrompts, search, config, t), [config, scoredPrompts, search, t]);
   const visiblePrompts = useMemo(() => uniqueById(promptSections.flatMap((section) => section.prompts.map((prompt) => ({
@@ -1055,16 +1085,40 @@ function App() {
     }
   }
 
-  async function copySelectedPrompt() {
+  async function chooseLocalFolder() {
+    const selected = await openDialog({ directory: true, multiple: false });
+    if (typeof selected === "string") {
+      setDraftConfig({ ...draftConfig, localRootDir: selected });
+    }
+  }
+
+  async function openOriginalPrompt() {
     if (!selectedPrompt) return;
     try {
-      await writeText(selectedPrompt.body);
+      if (selectedPrompt.source === "local") {
+        const root = config.localRootDir.replace(/[\\/]+$/, "");
+        await openPath(`${root}/${selectedPrompt.path}`);
+        return;
+      }
+      if (selectedPrompt.source === "github") {
+        const repo = parseGitHubRepo(config.repoUrl);
+        const encodedPath = selectedPrompt.path.split("/").map(encodeURIComponent).join("/");
+        await openUrl(`https://github.com/${repo.owner}/${repo.name}/blob/${encodeURIComponent(config.branch)}/${encodedPath}`);
+      }
+    } catch (error) {
+      setStatus(`Open failed: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  async function writePromptToClipboard(prompt: Prompt, body: string) {
+    try {
+      await writeText(body);
       setLocalState((current) => {
-        const previous = getPromptState(current, selectedPrompt.id);
+        const previous = getPromptState(current, prompt.id);
         return {
           prompts: {
             ...current.prompts,
-            [selectedPrompt.id]: {
+            [prompt.id]: {
               ...previous,
               useCount: previous.useCount + 1,
               lastUsedAt: new Date().toISOString(),
@@ -1072,16 +1126,34 @@ function App() {
           },
         };
       });
-      setCopiedPromptId(selectedPrompt.id);
-      window.setTimeout(() => setCopiedPromptId((id) => (id === selectedPrompt.id ? null : id)), 1200);
+      setCopiedPromptId(prompt.id);
+      window.setTimeout(() => setCopiedPromptId((id) => (id === prompt.id ? null : id)), 1200);
       setStatus(t.copied);
       window.setTimeout(() => {
         hideLauncher().catch(() => {});
       }, 420);
     } catch {
-      setManualCopyText(selectedPrompt.body);
+      setManualCopyText(body);
       setStatus(t.clipboardBlocked);
     }
+  }
+
+  async function copySelectedPrompt() {
+    if (!selectedPrompt) return;
+    const names = extractPromptVariables(selectedPrompt.body);
+    if (config.fillVariablesBeforeCopy && names.length) {
+      setVariablePrompt(selectedPrompt);
+      setVariableValues(Object.fromEntries(names.map((name) => [name, ""])));
+      return;
+    }
+    await writePromptToClipboard(selectedPrompt, selectedPrompt.body);
+  }
+
+  async function copyVariablePrompt() {
+    if (!variablePrompt) return;
+    await writePromptToClipboard(variablePrompt, fillPromptVariables(variablePrompt.body, variableValues));
+    setVariablePrompt(null);
+    setVariableValues({});
   }
 
   function toggleFavorite() {
@@ -1108,7 +1180,9 @@ function App() {
       languageMode: draftConfig.languageMode || defaultConfig.languageMode,
       alwaysOnTop: Boolean(draftConfig.alwaysOnTop),
       listMode: draftConfig.listMode || defaultConfig.listMode,
+      sourceFilter: draftConfig.sourceFilter || defaultConfig.sourceFilter,
       pinFavorites: Boolean(draftConfig.pinFavorites),
+      fillVariablesBeforeCopy: Boolean(draftConfig.fillVariablesBeforeCopy),
     };
     setConfig(nextConfig);
     setDraftConfig(nextConfig);
@@ -1167,6 +1241,26 @@ function App() {
             <div className="panel-label">
               <span>{visiblePrompts.length} {t.prompts}</span>
               <span>{query.trim() ? t.matched : promptIndex.source || "local"}</span>
+            </div>
+            <div className="mode-tabs source-tabs" aria-label={t.source}>
+              {([
+                ["all", t.showAllSources],
+                ["github", "GitHub"],
+                ["local", t.localSource],
+              ] as Array<[AppConfig["sourceFilter"], string]>).map(([source, label]) => (
+                <button
+                  key={source}
+                  type="button"
+                  className={`mode-tab source-tab${config.sourceFilter === source ? " is-active" : ""}`}
+                  onClick={() => {
+                    const nextConfig = { ...config, sourceFilter: source };
+                    setConfig(nextConfig);
+                    setDraftConfig(nextConfig);
+                  }}
+                >
+                  {label}
+                </button>
+              ))}
             </div>
             <div className="mode-tabs" aria-label={t.listMode}>
               {([
@@ -1244,6 +1338,16 @@ function App() {
                 <p>{selectedPrompt?.description || ""}</p>
               </div>
               <div className="preview-actions">
+                <button
+                  className="icon-button"
+                  type="button"
+                  title={t.openOriginal}
+                  aria-label={t.openOriginal}
+                  disabled={!selectedPrompt || selectedPrompt.source === "bundled"}
+                  onClick={openOriginalPrompt}
+                >
+                  ↗
+                </button>
                 <button
                   className={`text-button copy-button${selectedPrompt && copiedPromptId === selectedPrompt.id ? " is-copied" : ""}`}
                   type="button"
@@ -1350,7 +1454,10 @@ function App() {
               <div className="field-grid">
                 <label className="field">
                   <span>{t.localRootDirectory}</span>
-                  <input value={draftConfig.localRootDir} onChange={(event) => setDraftConfig({ ...draftConfig, localRootDir: event.currentTarget.value })} placeholder="/Users/me/prompts" />
+                  <span className="inline-field">
+                    <input value={draftConfig.localRootDir} onChange={(event) => setDraftConfig({ ...draftConfig, localRootDir: event.currentTarget.value })} placeholder="/Users/me/prompts" />
+                    <button className="text-button" type="button" onClick={chooseLocalFolder}>{t.choose}</button>
+                  </span>
                 </label>
                 <label className="field">
                   <span>{t.localPromptsDirectory}</span>
@@ -1423,6 +1530,14 @@ function App() {
               />
               <span>{t.pinFavorites}</span>
             </label>
+            <label className="check-field">
+              <input
+                type="checkbox"
+                checked={draftConfig.fillVariablesBeforeCopy}
+                onChange={(event) => setDraftConfig({ ...draftConfig, fillVariablesBeforeCopy: event.currentTarget.checked })}
+              />
+              <span>{t.fillVariablesBeforeCopy}</span>
+            </label>
             <div className="settings-meta">
               <div>{language === "zh-CN" ? "上次同步" : "Last sync"}: {promptIndex.generated_at ? new Date(promptIndex.generated_at).toLocaleString() : (language === "zh-CN" ? "从未" : "never")}</div>
               <div>{t.source}: {promptIndex.source || "bundled"}</div>
@@ -1434,6 +1549,36 @@ function App() {
               <button className="text-button primary" type="submit">{t.save}</button>
             </div>
           </form>
+        </section>
+      )}
+
+      {variablePrompt && (
+        <section className="manual-copy" onClick={() => setVariablePrompt(null)}>
+          <div className="manual-copy-panel variable-panel" onClick={(event) => event.stopPropagation()}>
+            <div className="manual-copy-head">
+              <div>
+                <h2>{variablePrompt.title}</h2>
+                <p>{language === "en-US" ? "Fill variables before copying." : "复制前填写变量。"}</p>
+              </div>
+              <button className="icon-button" type="button" onClick={() => setVariablePrompt(null)}>×</button>
+            </div>
+            <div className="variable-fields">
+              {variableNames.map((name) => (
+                <label className="field" key={name}>
+                  <span>{name}</span>
+                  <textarea
+                    value={variableValues[name] || ""}
+                    onChange={(event) => setVariableValues({ ...variableValues, [name]: event.currentTarget.value })}
+                    spellCheck={false}
+                  />
+                </label>
+              ))}
+            </div>
+            <div className="settings-actions variable-actions">
+              <button className="text-button" type="button" onClick={() => setVariablePrompt(null)}>{language === "en-US" ? "Cancel" : "取消"}</button>
+              <button className="text-button primary" type="button" onClick={copyVariablePrompt}>{t.copy}</button>
+            </div>
+          </div>
         </section>
       )}
     </main>
