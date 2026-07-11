@@ -2,7 +2,7 @@
 
 ## macOS unsigned distribution
 
-The macOS builds are not signed with an Apple Developer ID certificate and are not notarized. Gatekeeper may block the first launch. A DMG drag-and-drop layout improves installation, but it cannot remove this security restriction.
+The macOS builds use explicit deep ad-hoc signing, but are not signed with an Apple Developer ID certificate and are not notarized. This should avoid the “app is damaged” failure mode, but Gatekeeper will still block or warn on the first launch until the user allows the app. A DMG drag-and-drop layout improves installation, but it cannot remove this security restriction.
 
 ## Why pp cannot always show the help dialog
 

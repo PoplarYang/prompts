@@ -21,6 +21,18 @@ def fail(message: str) -> int:
     return 1
 
 
+def verify_adhoc_signature(app: Path) -> None:
+    if shutil.which("codesign") is None:
+        raise ValueError("Missing macOS codesign command")
+    verified = subprocess.run(["codesign", "--verify", "--deep", "--strict", str(app)], capture_output=True, text=True)
+    if verified.returncode != 0:
+        raise ValueError(f"macOS app code signature is invalid: {verified.stderr.strip()}")
+    details = subprocess.run(["codesign", "-dv", "--verbose=4", str(app)], capture_output=True, text=True)
+    signature_output = f"{details.stdout}\n{details.stderr}"
+    if "Signature=adhoc" not in signature_output and "flags=0x20002(adhoc" not in signature_output:
+        raise ValueError("macOS app is not ad-hoc signed")
+
+
 def verify_zip(artifact: Path) -> None:
     with zipfile.ZipFile(artifact) as archive:
         if archive.testzip() is not None:
@@ -78,6 +90,10 @@ def main() -> int:
         return fail("CFBundleName should be pp")
     if info.get("CFBundleIdentifier") != "com.poplaryang.pp":
         return fail("CFBundleIdentifier should be com.poplaryang.pp")
+    try:
+        verify_adhoc_signature(APP)
+    except ValueError as error:
+        return fail(str(error))
 
     if zip_artifact.stat().st_size < 1_000_000:
         return fail("Desktop zip is unexpectedly small")

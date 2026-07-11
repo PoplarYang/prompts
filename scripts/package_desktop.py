@@ -50,8 +50,12 @@ def main() -> int:
         return fail("Missing macOS ditto command")
     if shutil.which("hdiutil") is None:
         return fail("Missing macOS hdiutil command")
+    if shutil.which("codesign") is None:
+        return fail("Missing macOS codesign command")
 
     DIST.mkdir(exist_ok=True)
+    run(["codesign", "--force", "--deep", "--sign", "-", "--timestamp=none", str(APP)])
+    run(["codesign", "--verify", "--deep", "--strict", str(APP)])
     run(["ditto", "-c", "-k", "--sequesterRsrc", "--keepParent", str(APP), str(ZIP)])
     with tempfile.TemporaryDirectory(prefix="pp-dmg-") as directory:
         staging = Path(directory)
