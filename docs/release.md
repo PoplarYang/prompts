@@ -2,6 +2,8 @@
 
 `pp` is released as static web artifacts plus desktop packages. Until Developer ID signing and notarization are configured, macOS ZIP is the primary distribution format and requires one manual Gatekeeper approval.
 
+The complete macOS packaging history and troubleshooting decisions are documented in [macOS Distribution Guide](macos-distribution-guide.md).
+
 ## Build
 
 ```sh

@@ -6,7 +6,7 @@ The macOS builds use explicit deep ad-hoc signing, but are not signed with an Ap
 
 ## Why pp cannot always show the help dialog
 
-If macOS blocks `pp.app` before launch, pp code is not running and cannot display an in-app dialog. The DMG therefore includes `README-MACOS.txt` with installation and troubleshooting steps. Once pp launches, a future onboarding dialog can guide users who are running it from Downloads instead of Applications.
+If macOS blocks `pp.app` before launch, pp code is not running and cannot display an in-app dialog. Installation steps therefore live in the DMG layout, Release notes, and the macOS distribution guide. Once pp launches, the installation-help dialog can guide users who are running it from Downloads instead of Applications.
 
 ## Current macOS installation paths
 
