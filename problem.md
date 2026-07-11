@@ -15,6 +15,10 @@ If macOS blocks `pp.app` before launch, pp code is not running and cannot displa
 - First launch: right-click `pp.app` and choose `Open`.
 - If there is no approval button in Privacy & Security, users may need to run `xattr -cr /Applications/pp.app` and then open the app again.
 
+## DMG presentation
+
+The DMG uses `create-dmg` to provide the familiar app-to-Applications layout. The visual layout is only an installer aid; it does not change Gatekeeper trust or replace notarization.
+
 ## DMG versus ZIP
 
 DMG provides the familiar drag-and-drop experience, but it is still subject to Gatekeeper and can be damaged by an incomplete download. ZIP is simpler and remains the fallback distribution format.

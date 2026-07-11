@@ -73,6 +73,12 @@ python3 scripts/verify_desktop_package.py
 python3 scripts/verify_windows_package.py path/to/pp-setup.exe
 ```
 
+The macOS DMG uses `create-dmg`. Install it once before local packaging:
+
+```sh
+npm install --global create-dmg
+```
+
 Outputs:
 
 ```txt
@@ -85,7 +91,7 @@ dist/pp-desktop-macos-x64.dmg
 
 GitHub Actions builds both macOS architectures: Apple Silicon on `macos-14` and Intel on `macos-15-intel`. The local package script produces the architecture of the current Mac.
 
-The DMG uses the standard drag-and-drop layout: `pp.app` beside an `Applications` shortcut, with `README-MACOS.txt` included for first-launch troubleshooting. The ZIP remains the fallback artifact.
+The DMG uses the standard drag-and-drop layout: `pp.app` beside an `Applications` shortcut with a light background and arrow. The ZIP remains the fallback artifact; installation troubleshooting is documented in the Release notes and the app's first-launch help.
 
 The current macOS artifacts use explicit deep ad-hoc signing but are not notarized. This is intended to avoid the “app is damaged” failure mode while keeping the expected first-launch warning: extract `pp.app`, move it to Applications, right-click it, choose Open, and allow it in Privacy & Security if prompted. If macOS still reports that it is damaged, run `xattr -cr /Applications/pp.app`. GitHub Actions verifies the ad-hoc signature and package layout; only Apple Developer ID signing and notarization can remove the manual approval step.
 

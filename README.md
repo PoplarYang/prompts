@@ -57,6 +57,12 @@ cd ..
 python3 scripts/package_desktop.py
 ```
 
+Local macOS DMG packaging requires `create-dmg`:
+
+```sh
+npm install --global create-dmg
+```
+
 Current verified macOS desktop outputs:
 
 ```txt

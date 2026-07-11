@@ -6,7 +6,6 @@ from __future__ import annotations
 import shutil
 import subprocess
 import platform
-import tempfile
 from pathlib import Path
 
 
@@ -52,27 +51,30 @@ def main() -> int:
         return fail("Missing macOS hdiutil command")
     if shutil.which("codesign") is None:
         return fail("Missing macOS codesign command")
+    if shutil.which("create-dmg") is None:
+        return fail("Missing create-dmg command. Install with: npm install --global create-dmg")
 
     DIST.mkdir(exist_ok=True)
     run(["codesign", "--force", "--deep", "--sign", "-", "--timestamp=none", str(APP)])
     run(["codesign", "--verify", "--deep", "--strict", str(APP)])
     run(["ditto", "-c", "-k", "--sequesterRsrc", "--keepParent", str(APP), str(ZIP)])
-    with tempfile.TemporaryDirectory(prefix="pp-dmg-") as directory:
-        staging = Path(directory)
-        shutil.copytree(APP, staging / "pp.app", symlinks=True)
-        (staging / "Applications").symlink_to("/Applications", target_is_directory=True)
-        (staging / "README-MACOS.txt").write_text(
-            "pp macOS 安装说明 / macOS Installation\n\n"
-            "1. 将 pp.app 拖到 Applications。\n"
-            "2. 在 Applications 中右键点击 pp.app，选择‘打开’。\n"
-            "3. 如果 macOS 阻止启动，请查看‘系统设置 → 隐私与安全性’。\n"
-            "4. 如果仍无法打开，在终端执行：\n\n"
-            "   xattr -cr /Applications/pp.app\n"
-            "   open /Applications/pp.app\n\n"
-            "This build is not notarized. The first launch may require manual approval.\n",
-            encoding="utf-8",
-        )
-        run(["hdiutil", "create", "-volname", "pp", "-srcfolder", str(staging), "-ov", "-format", "UDZO", str(DMG)])
+    generated_dmg = DIST / "pp.dmg"
+    generated_dmg.unlink(missing_ok=True)
+    run([
+        "create-dmg",
+        "--overwrite",
+        "--no-version-in-filename",
+        "--no-code-sign",
+        "--dmg-title=pp",
+        str(APP),
+        str(DIST),
+    ])
+    if not generated_dmg.exists():
+        candidates = sorted(DIST.glob("*.dmg"), key=lambda path: path.stat().st_mtime, reverse=True)
+        if not candidates:
+            return fail("create-dmg did not produce a DMG")
+        candidates[0].rename(generated_dmg)
+    generated_dmg.replace(DMG)
 
     print(f"OK: wrote {ZIP.relative_to(ROOT)}")
     print(f"OK: wrote {DMG.relative_to(ROOT)}")

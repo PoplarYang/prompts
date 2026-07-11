@@ -68,6 +68,11 @@ def main() -> int:
         if snippet not in lib:
             return fail(f"Missing desktop reopen behavior: {snippet}")
 
+    package_script = (ROOT / "scripts/package_desktop.py").read_text(encoding="utf-8")
+    for snippet in ["create-dmg", "--no-code-sign", "--dmg-title=pp"]:
+        if snippet not in package_script:
+            return fail(f"Missing macOS DMG packaging behavior: {snippet}")
+
     capabilities = (DESKTOP / "src-tauri/capabilities/default.json").read_text(encoding="utf-8")
     for permission in [
         "core:window:allow-hide",
