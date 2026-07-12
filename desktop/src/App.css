@@ -1301,6 +1301,47 @@ kbd {
 }
 
 @media (max-width: 760px) {
+  .settings-panel {
+    width: 100%;
+    max-height: calc(100vh - 24px);
+    overflow-y: auto;
+    gap: 12px;
+  }
+
+  .settings-panel .field,
+  .settings-panel .check-field,
+  .settings-panel .settings-meta,
+  .settings-panel .settings-actions,
+  .settings-panel .field-grid,
+  .settings-about {
+    margin-inline: 14px;
+  }
+
+  .settings-section-title {
+    margin-inline: 14px;
+  }
+
+  .settings-panel .field-grid {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .settings-about {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .about-actions {
+    justify-content: flex-start;
+  }
+
+  .settings-panel .settings-actions {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 6px;
+  }
+
   .preview-panel {
     padding-inline: 16px;
   }
@@ -1311,6 +1352,15 @@ kbd {
 
   .preview-actions {
     justify-content: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .preview-meta h1 {
+    font-size: 23px;
+  }
+
+  .tag-row {
+    row-gap: 6px;
   }
 
   .keymap {
