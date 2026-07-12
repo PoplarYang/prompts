@@ -50,7 +50,9 @@ fn activate_launcher_window(window: tauri::WebviewWindow) -> Result<(), String> 
     #[cfg(target_os = "macos")]
     {
         use objc2::MainThreadMarker;
-        use objc2_app_kit::{NSApplication, NSWindow, NSWindowCollectionBehavior, NSFloatingWindowLevel};
+        use objc2_app_kit::{
+            NSApplication, NSWindow, NSWindowCollectionBehavior, NSScreenSaverWindowLevel,
+        };
 
         let native_window = window
             .ns_window()
@@ -68,7 +70,8 @@ fn activate_launcher_window(window: tauri::WebviewWindow) -> Result<(), String> 
                         | NSWindowCollectionBehavior::Transient
                         | NSWindowCollectionBehavior::IgnoresCycle,
                 );
-                window.setLevel(NSFloatingWindowLevel);
+                // A screen-saver-level panel can cross another app's full-screen Space.
+                window.setLevel(NSScreenSaverWindowLevel);
                 #[allow(deprecated)]
                 app.activateIgnoringOtherApps(true);
                 window.makeKeyAndOrderFront(None);
