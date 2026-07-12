@@ -7,7 +7,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .plugin(tauri_plugin_clipboard_manager::init())
-        .invoke_handler(tauri::generate_handler![read_local_prompt_files, app_installation_status])
+        .invoke_handler(tauri::generate_handler![read_local_prompt_files, app_installation_status, activate_launcher_window])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
         .run(|app, event| {
@@ -40,6 +40,44 @@ fn app_installation_status() -> AppInstallationStatus {
         is_in_applications: cfg!(target_os = "macos") && path.contains("/Applications/"),
         executable_path: path,
     }
+}
+
+#[tauri::command]
+fn activate_launcher_window(window: tauri::WebviewWindow) -> Result<(), String> {
+    window.unminimize().map_err(|error| error.to_string())?;
+    window.show().map_err(|error| error.to_string())?;
+
+    #[cfg(target_os = "macos")]
+    {
+        use objc2::MainThreadMarker;
+        use objc2_app_kit::{NSApplication, NSWindow, NSWindowCollectionBehavior, NSFloatingWindowLevel};
+
+        let native_window = window
+            .ns_window()
+            .map_err(|error| error.to_string())? as usize;
+        window
+            .run_on_main_thread(move || {
+                let Some(marker) = MainThreadMarker::new() else { return };
+                let app = NSApplication::sharedApplication(marker);
+                let window: &NSWindow = unsafe {
+                    &*((native_window as *mut std::ffi::c_void).cast())
+                };
+                window.setCollectionBehavior(
+                    NSWindowCollectionBehavior::CanJoinAllSpaces
+                        | NSWindowCollectionBehavior::FullScreenAuxiliary
+                        | NSWindowCollectionBehavior::MoveToActiveSpace
+                        | NSWindowCollectionBehavior::IgnoresCycle,
+                );
+                window.setLevel(NSFloatingWindowLevel);
+                #[allow(deprecated)]
+                app.activateIgnoringOtherApps(true);
+                window.makeKeyAndOrderFront(None);
+                window.orderFrontRegardless();
+            })
+            .map_err(|error| error.to_string())?;
+    }
+
+    window.set_focus().map_err(|error| error.to_string())
 }
 
 #[derive(serde::Serialize)]

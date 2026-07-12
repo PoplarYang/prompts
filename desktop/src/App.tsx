@@ -1026,12 +1026,13 @@ function App() {
 
   const showLauncher = useCallback(async () => {
     const appWindow = getCurrentWindow();
-    // Full-screen apps live in a separate macOS Space. Promote pp before showing it.
-    await appWindow.setVisibleOnAllWorkspaces(true).catch(() => {});
-    await appWindow.setAlwaysOnTop(true).catch(() => {});
-    await appWindow.unminimize();
-    await appWindow.show();
-    await appWindow.setFocus();
+    await invoke("activate_launcher_window").catch(async () => {
+      await appWindow.setVisibleOnAllWorkspaces(true).catch(() => {});
+      await appWindow.setAlwaysOnTop(true).catch(() => {});
+      await appWindow.unminimize();
+      await appWindow.show();
+      await appWindow.setFocus();
+    });
     focusSearch();
   }, [focusSearch]);
 
