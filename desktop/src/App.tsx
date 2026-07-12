@@ -1026,6 +1026,9 @@ function App() {
 
   const showLauncher = useCallback(async () => {
     const appWindow = getCurrentWindow();
+    // Full-screen apps live in a separate macOS Space. Promote pp before showing it.
+    await appWindow.setVisibleOnAllWorkspaces(true).catch(() => {});
+    await appWindow.setAlwaysOnTop(true).catch(() => {});
     await appWindow.unminimize();
     await appWindow.show();
     await appWindow.setFocus();
@@ -1033,7 +1036,10 @@ function App() {
   }, [focusSearch]);
 
   const hideLauncher = useCallback(async () => {
-    await getCurrentWindow().hide();
+    const appWindow = getCurrentWindow();
+    await appWindow.hide();
+    await appWindow.setAlwaysOnTop(configRef.current.alwaysOnTop).catch(() => {});
+    await appWindow.setVisibleOnAllWorkspaces(false).catch(() => {});
   }, []);
 
   const toggleLauncher = useCallback(async () => {
