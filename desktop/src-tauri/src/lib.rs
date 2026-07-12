@@ -65,7 +65,7 @@ fn activate_launcher_window(window: tauri::WebviewWindow) -> Result<(), String> 
                 window.setCollectionBehavior(
                     NSWindowCollectionBehavior::CanJoinAllSpaces
                         | NSWindowCollectionBehavior::FullScreenAuxiliary
-                        | NSWindowCollectionBehavior::MoveToActiveSpace
+                        | NSWindowCollectionBehavior::Transient
                         | NSWindowCollectionBehavior::IgnoresCycle,
                 );
                 window.setLevel(NSFloatingWindowLevel);
