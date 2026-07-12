@@ -130,7 +130,7 @@ def main() -> int:
         "getHighlightCandidates",
         "highlightText",
         "highlightEscapedHtml",
-        "renderMarkdown(selectedPrompt.body, search, copiedCodeIndex)",
+        "renderMarkdown(prompt.body, search, copiedCodeIndex)",
         "buildSections",
         "alwaysOnTop",
         "setAlwaysOnTop",

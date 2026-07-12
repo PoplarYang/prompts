@@ -1103,6 +1103,38 @@ kbd {
   scrollbar-gutter: stable;
 }
 
+.markdown-collection.has-sections {
+  max-width: 900px;
+}
+
+.prompt-block + .prompt-block {
+  margin-top: 22px;
+  padding-top: 18px;
+  border-top: 1px solid var(--line-soft);
+}
+
+.prompt-block-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.prompt-block-head h2 {
+  min-width: 0;
+  margin: 0;
+  color: var(--text);
+  font-size: 16px;
+  line-height: 1.3;
+}
+
+.block-copy {
+  flex: 0 0 auto;
+  min-width: 60px;
+  min-height: 30px;
+}
+
 .markdown h1,
 .markdown h2,
 .markdown h3 {

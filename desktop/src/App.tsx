@@ -18,6 +18,8 @@ type Prompt = {
   path: string;
   body: string;
   source?: "github" | "local" | "bundled";
+  short?: boolean;
+  collectionTitle?: string;
 };
 
 type AppInstallationStatus = {
@@ -658,6 +660,8 @@ function promptEntries(path: string, meta: Record<string, unknown>, body: string
     path,
     body: section.body.trimEnd() + "\n",
     source,
+    short: meta.short === true,
+    collectionTitle: baseTitle,
   }));
 }
 
@@ -891,7 +895,7 @@ function App() {
   const configRef = useRef(config);
   const settingsOpenRef = useRef(settingsOpen);
   const manualCopyTextRef = useRef(manualCopyText);
-  const markdownRef = useRef<HTMLElement>(null);
+  const markdownRef = useRef<HTMLDivElement>(null);
   const language = resolveLanguage(config.languageMode);
   const t = messages[language];
   const search = useMemo(() => parseSearchQuery(query), [query]);
@@ -917,6 +921,20 @@ function App() {
 
   const selectedIndex = Math.max(visiblePrompts.findIndex((prompt) => prompt.id === selectedPromptId), 0);
   const selectedPrompt = visiblePrompts[selectedIndex] ?? visiblePrompts[0];
+  const visiblePromptGroups = useMemo(() => {
+    const groups = new Map<string, Prompt[]>();
+    visiblePrompts.forEach((prompt) => {
+      const key = `${prompt.source || "bundled"}:${prompt.path}`;
+      groups.set(key, [...(groups.get(key) || []), prompt]);
+    });
+    return [...groups.values()];
+  }, [visiblePrompts]);
+  const selectedCollection = useMemo(() => {
+    if (!selectedPrompt?.short) return selectedPrompt ? [selectedPrompt] : [];
+    return promptIndex.prompts.filter((prompt) =>
+      prompt.short && prompt.source === selectedPrompt.source && prompt.path === selectedPrompt.path,
+    );
+  }, [promptIndex.prompts, selectedPrompt]);
 
   useEffect(() => {
     localStorage.setItem(configKey, JSON.stringify(config));
@@ -1206,15 +1224,19 @@ function App() {
     }
   }
 
-  async function copySelectedPrompt() {
-    if (!selectedPrompt) return;
-    const names = extractPromptVariables(selectedPrompt.body);
+  async function copyPrompt(prompt: Prompt) {
+    const names = extractPromptVariables(prompt.body);
     if (config.fillVariablesBeforeCopy && names.length) {
-      setVariablePrompt(selectedPrompt);
+      setVariablePrompt(prompt);
       setVariableValues(Object.fromEntries(names.map((name) => [name, ""])));
       return;
     }
-    await writePromptToClipboard(selectedPrompt, selectedPrompt.body);
+    await writePromptToClipboard(prompt, prompt.body);
+  }
+
+  async function copySelectedPrompt() {
+    if (!selectedPrompt) return;
+    await copyPrompt(selectedPrompt);
   }
 
   async function copyVariablePrompt() {
@@ -1359,15 +1381,18 @@ function App() {
               {promptSections.map((section) => (
                 <section className="result-section" key={section.id}>
                   <div className="result-section-title">{section.label}</div>
-                  {section.prompts.map((prompt) => {
-                    const index = visiblePrompts.findIndex((item) => item.id === prompt.id);
+                  {visiblePromptGroups
+                    .filter((group) => group.some((prompt) => section.prompts.some((item) => item.id === prompt.id)))
+                    .map((group) => {
+                    const prompt = group[0];
+                    const isSelected = group.some((item) => item.id === selectedPromptId);
                     const promptState = getPromptState(localState, prompt.id);
                     return (
                       <button
-                        key={`${section.id}-${prompt.id}`}
+                        key={`${section.id}-${prompt.source}-${prompt.path}`}
                         type="button"
-                        className={`result${index === selectedIndex ? " is-selected" : ""}`}
-                        onClick={() => setSelectedPromptId(prompt.id)}
+                        className={`result${isSelected ? " is-selected" : ""}`}
+                        onClick={() => setSelectedPromptId(group.find((item) => item.id === selectedPromptId)?.id ?? prompt.id)}
                       >
                         <span className={`favorite-mark${promptState.favorite ? " is-on" : ""}`}>
                           {promptState.favorite ? "★" : "☆"}
@@ -1378,6 +1403,7 @@ function App() {
                               {sourceIcon(prompt.source)}
                             </span>
                             {highlightText(prompt.title, search)}
+                            {group.length > 1 && <span className="collection-count"> · {group.length}</span>}
                           </span>
                           <span className="result-description">{highlightText(prompt.description, search)}</span>
                           <span className="result-tags">
@@ -1410,7 +1436,7 @@ function App() {
           <section className="preview-panel">
             <div className="preview-meta">
               <div>
-                <h1>{selectedPrompt?.title || t.noPromptSelected}</h1>
+                <h1>{selectedPrompt?.collectionTitle || selectedPrompt?.title || t.noPromptSelected}</h1>
                 <p>{selectedPrompt?.description || ""}</p>
               </div>
               <div className="preview-actions">
@@ -1451,11 +1477,28 @@ function App() {
               )}
               {selectedPrompt?.path}
             </div>
-            <article
+            <div
               ref={markdownRef}
-              className="markdown"
-              dangerouslySetInnerHTML={{ __html: selectedPrompt ? renderMarkdown(selectedPrompt.body, search, copiedCodeIndex) : "" }}
-            />
+              className={`markdown markdown-collection${selectedCollection.length > 1 ? " has-sections" : ""}`}
+            >
+              {selectedCollection.map((prompt) => (
+                <section className="prompt-block" key={prompt.id}>
+                  {selectedCollection.length > 1 && (
+                    <div className="prompt-block-head">
+                      <h2>{highlightText(prompt.title, search)}</h2>
+                      <button
+                        className={`text-button block-copy${copiedPromptId === prompt.id ? " is-copied" : ""}`}
+                        type="button"
+                        onClick={() => copyPrompt(prompt)}
+                      >
+                        {copiedPromptId === prompt.id ? t.copied : t.copy}
+                      </button>
+                    </div>
+                  )}
+                  <article dangerouslySetInnerHTML={{ __html: renderMarkdown(prompt.body, search, copiedCodeIndex) }} />
+                </section>
+              ))}
+            </div>
           </section>
         </div>
 
