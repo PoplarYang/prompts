@@ -7,6 +7,13 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .plugin(tauri_plugin_clipboard_manager::init())
+        .setup(|app| {
+            #[cfg(target_os = "macos")]
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = configure_macos_launcher_window(&window);
+            }
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![read_local_prompt_files, app_installation_status, activate_launcher_window])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
@@ -22,6 +29,36 @@ pub fn run() {
                 }
             }
         });
+}
+
+#[cfg(target_os = "macos")]
+fn configure_macos_launcher_window(window: &tauri::WebviewWindow) -> Result<(), String> {
+    use objc2::MainThreadMarker;
+    use objc2_app_kit::{
+        NSApplication, NSWindow, NSWindowCollectionBehavior, NSScreenSaverWindowLevel,
+    };
+
+    let native_window = window
+        .ns_window()
+        .map_err(|error| error.to_string())? as usize;
+    window
+        .run_on_main_thread(move || {
+            let Some(marker) = MainThreadMarker::new() else { return };
+            let app = NSApplication::sharedApplication(marker);
+            let window: &NSWindow = unsafe {
+                &*((native_window as *mut std::ffi::c_void).cast())
+            };
+            window.setCollectionBehavior(
+                NSWindowCollectionBehavior::CanJoinAllSpaces
+                    | NSWindowCollectionBehavior::FullScreenAuxiliary
+                    | NSWindowCollectionBehavior::Transient
+                    | NSWindowCollectionBehavior::IgnoresCycle,
+            );
+            window.setLevel(NSScreenSaverWindowLevel);
+            #[allow(deprecated)]
+            app.activateIgnoringOtherApps(true);
+        })
+        .map_err(|error| error.to_string())
 }
 
 #[derive(serde::Serialize)]
@@ -49,31 +86,16 @@ fn activate_launcher_window(window: tauri::WebviewWindow) -> Result<(), String> 
 
     #[cfg(target_os = "macos")]
     {
-        use objc2::MainThreadMarker;
-        use objc2_app_kit::{
-            NSApplication, NSWindow, NSWindowCollectionBehavior, NSScreenSaverWindowLevel,
-        };
-
+        configure_macos_launcher_window(&window)?;
         let native_window = window
             .ns_window()
             .map_err(|error| error.to_string())? as usize;
         window
             .run_on_main_thread(move || {
-                let Some(marker) = MainThreadMarker::new() else { return };
-                let app = NSApplication::sharedApplication(marker);
-                let window: &NSWindow = unsafe {
+                let Some(_marker) = objc2::MainThreadMarker::new() else { return };
+                let window: &objc2_app_kit::NSWindow = unsafe {
                     &*((native_window as *mut std::ffi::c_void).cast())
                 };
-                window.setCollectionBehavior(
-                    NSWindowCollectionBehavior::CanJoinAllSpaces
-                        | NSWindowCollectionBehavior::FullScreenAuxiliary
-                        | NSWindowCollectionBehavior::Transient
-                        | NSWindowCollectionBehavior::IgnoresCycle,
-                );
-                // A screen-saver-level panel can cross another app's full-screen Space.
-                window.setLevel(NSScreenSaverWindowLevel);
-                #[allow(deprecated)]
-                app.activateIgnoringOtherApps(true);
                 window.makeKeyAndOrderFront(None);
                 window.orderFrontRegardless();
             })
