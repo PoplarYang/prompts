@@ -1,20 +1,55 @@
+use tauri::Manager;
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    use tauri::Manager;
+    use tauri::Emitter;
+    use tauri_plugin_global_shortcut::ShortcutState;
+
+    let global_shortcut = tauri_plugin_global_shortcut::Builder::new()
+        .with_shortcut(DEFAULT_WAKE_SHORTCUT)
+        .expect("default wake shortcut must be valid")
+        .with_handler(|app, _, event| {
+            if event.state() != ShortcutState::Pressed {
+                return;
+            }
+            wake_debug_log("native hotkey received");
+            match toggle_launcher_window_for_app(app) {
+                Ok(shown) => {
+                    wake_debug_log(if shown {
+                        "native launcher shown"
+                    } else {
+                        "native launcher hidden"
+                    });
+                    let _ = app.emit("pp://wake-shortcut", shown);
+                }
+                Err(error) => wake_debug_log(&format!("native launcher error: {error}")),
+            }
+        })
+        .build();
 
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
-        .plugin(tauri_plugin_global_shortcut::Builder::new().build())
+        .plugin(global_shortcut)
         .plugin(tauri_plugin_clipboard_manager::init())
         .setup(|app| {
+            app.manage(WakeShortcutState(std::sync::Mutex::new(
+                DEFAULT_WAKE_SHORTCUT.to_string(),
+            )));
+            wake_debug_log("native wake handler initialized");
             #[cfg(target_os = "macos")]
             if let Some(window) = app.get_webview_window("main") {
                 let _ = configure_macos_launcher_window(&window);
             }
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![read_local_prompt_files, app_installation_status, activate_launcher_window])
+        .invoke_handler(tauri::generate_handler![
+            read_local_prompt_files,
+            app_installation_status,
+            toggle_launcher_window,
+            set_wake_shortcut,
+            configure_launcher_behavior
+        ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
         .run(|app, event| {
@@ -31,20 +66,45 @@ pub fn run() {
         });
 }
 
+const DEFAULT_WAKE_SHORTCUT: &str = "CommandOrControl+Shift+P";
+
+struct WakeShortcutState(std::sync::Mutex<String>);
+
+fn wake_debug_log(message: &str) {
+    #[cfg(target_os = "macos")]
+    {
+        use std::io::Write;
+
+        let Some(home) = std::env::var_os("HOME") else {
+            return;
+        };
+        let directory = std::path::PathBuf::from(home).join("Library/Application Support/pp");
+        if std::fs::create_dir_all(&directory).is_err() {
+            return;
+        }
+        if let Ok(mut file) = std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(directory.join("wake.log"))
+        {
+            let _ = writeln!(file, "{:?} {message}", std::time::SystemTime::now());
+        }
+    }
+}
+
 #[cfg(target_os = "macos")]
-fn configure_macos_launcher_window(window: &tauri::WebviewWindow) -> Result<(), String> {
+fn configure_macos_launcher_window<R: tauri::Runtime>(
+    window: &tauri::WebviewWindow<R>,
+) -> Result<(), String> {
     use objc2::MainThreadMarker;
-    use objc2_app_kit::{
-        NSApplication, NSWindow, NSWindowCollectionBehavior, NSScreenSaverWindowLevel,
-    };
+    use objc2_app_kit::{NSWindow, NSWindowCollectionBehavior, NSScreenSaverWindowLevel};
 
     let native_window = window
         .ns_window()
         .map_err(|error| error.to_string())? as usize;
     window
         .run_on_main_thread(move || {
-            let Some(marker) = MainThreadMarker::new() else { return };
-            let app = NSApplication::sharedApplication(marker);
+            let Some(_marker) = MainThreadMarker::new() else { return };
             let window: &NSWindow = unsafe {
                 &*((native_window as *mut std::ffi::c_void).cast())
             };
@@ -55,8 +115,6 @@ fn configure_macos_launcher_window(window: &tauri::WebviewWindow) -> Result<(), 
                     | NSWindowCollectionBehavior::IgnoresCycle,
             );
             window.setLevel(NSScreenSaverWindowLevel);
-            #[allow(deprecated)]
-            app.activateIgnoringOtherApps(true);
         })
         .map_err(|error| error.to_string())
 }
@@ -80,29 +138,130 @@ fn app_installation_status() -> AppInstallationStatus {
 }
 
 #[tauri::command]
-fn activate_launcher_window(window: tauri::WebviewWindow) -> Result<(), String> {
-    window.unminimize().map_err(|error| error.to_string())?;
-    window.show().map_err(|error| error.to_string())?;
+fn set_wake_shortcut(
+    app: tauri::AppHandle,
+    state: tauri::State<'_, WakeShortcutState>,
+    shortcut: String,
+) -> Result<String, String> {
+    use tauri_plugin_global_shortcut::GlobalShortcutExt;
 
+    let shortcut = shortcut.trim().to_string();
+    if shortcut.is_empty() {
+        return Err("Wake shortcut cannot be empty".into());
+    }
+
+    let mut current = state.0.lock().map_err(|_| "Wake shortcut state is unavailable")?;
+    if *current == shortcut {
+        return Ok(shortcut);
+    }
+
+    let previous = current.clone();
+    app.global_shortcut()
+        .unregister(previous.as_str())
+        .map_err(|error| error.to_string())?;
+
+    if let Err(error) = app.global_shortcut().register(shortcut.as_str()) {
+        let _ = app.global_shortcut().register(previous.as_str());
+        return Err(error.to_string());
+    }
+
+    *current = shortcut.clone();
+    wake_debug_log(&format!("native shortcut configured: {shortcut}"));
+    Ok(shortcut)
+}
+
+#[tauri::command]
+fn configure_launcher_behavior(
+    window: tauri::WebviewWindow,
+    always_on_top: bool,
+) -> Result<(), String> {
     #[cfg(target_os = "macos")]
     {
-        configure_macos_launcher_window(&window)?;
+        let _ = always_on_top;
+        return configure_macos_launcher_window(&window);
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    window
+        .set_always_on_top(always_on_top)
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+fn toggle_launcher_window(window: tauri::WebviewWindow) -> Result<bool, String> {
+    toggle_launcher_window_impl(&window)
+}
+
+fn toggle_launcher_window_for_app<R: tauri::Runtime>(
+    app: &tauri::AppHandle<R>,
+) -> Result<bool, String> {
+    let window = app
+        .get_webview_window("main")
+        .ok_or_else(|| "Main window is unavailable".to_string())?;
+    toggle_launcher_window_impl(&window)
+}
+
+fn toggle_launcher_window_impl<R: tauri::Runtime>(
+    window: &tauri::WebviewWindow<R>,
+) -> Result<bool, String> {
+    #[cfg(target_os = "macos")]
+    {
+        use std::sync::{atomic::{AtomicBool, Ordering}, Arc};
+
         let native_window = window
             .ns_window()
             .map_err(|error| error.to_string())? as usize;
+        let was_key = Arc::new(AtomicBool::new(false));
+        let was_key_for_main = Arc::clone(&was_key);
         window
             .run_on_main_thread(move || {
                 let Some(_marker) = objc2::MainThreadMarker::new() else { return };
                 let window: &objc2_app_kit::NSWindow = unsafe {
                     &*((native_window as *mut std::ffi::c_void).cast())
                 };
+                was_key_for_main.store(window.isKeyWindow(), Ordering::Release);
+            })
+            .map_err(|error| error.to_string())?;
+
+        if was_key.load(Ordering::Acquire) {
+            window.hide().map_err(|error| error.to_string())?;
+            return Ok(false);
+        }
+
+        configure_macos_launcher_window(window)?;
+        window.unminimize().map_err(|error| error.to_string())?;
+        window.show().map_err(|error| error.to_string())?;
+        let native_window = window
+            .ns_window()
+            .map_err(|error| error.to_string())? as usize;
+        window
+            .run_on_main_thread(move || {
+                let Some(marker) = objc2::MainThreadMarker::new() else { return };
+                let app = objc2_app_kit::NSApplication::sharedApplication(marker);
+                let window: &objc2_app_kit::NSWindow = unsafe {
+                    &*((native_window as *mut std::ffi::c_void).cast())
+                };
+                #[allow(deprecated)]
+                app.activateIgnoringOtherApps(true);
                 window.makeKeyAndOrderFront(None);
                 window.orderFrontRegardless();
             })
             .map_err(|error| error.to_string())?;
+        window.set_focus().map_err(|error| error.to_string())?;
+        return Ok(true);
     }
 
-    window.set_focus().map_err(|error| error.to_string())
+    #[cfg(not(target_os = "macos"))]
+    {
+        if window.is_visible().map_err(|error| error.to_string())? {
+            window.hide().map_err(|error| error.to_string())?;
+            return Ok(false);
+        }
+        window.unminimize().map_err(|error| error.to_string())?;
+        window.show().map_err(|error| error.to_string())?;
+        window.set_focus().map_err(|error| error.to_string())?;
+        Ok(true)
+    }
 }
 
 #[derive(serde::Serialize)]

@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
-import { isRegistered, register, unregister } from "@tauri-apps/plugin-global-shortcut";
 import { openPath, openUrl } from "@tauri-apps/plugin-opener";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { ExternalLink, RefreshCw, Settings, Star } from "lucide-react";
@@ -1024,70 +1024,38 @@ function App() {
     }, 30);
   }, []);
 
-  const showLauncher = useCallback(async () => {
-    const appWindow = getCurrentWindow();
-    await invoke("activate_launcher_window").catch(async () => {
-      await appWindow.setVisibleOnAllWorkspaces(true).catch(() => {});
-      await appWindow.setAlwaysOnTop(true).catch(() => {});
-      await appWindow.unminimize();
-      await appWindow.show();
-      await appWindow.setFocus();
-    });
-    focusSearch();
-  }, [focusSearch]);
-
   const hideLauncher = useCallback(async () => {
     const appWindow = getCurrentWindow();
     await appWindow.hide();
-    await appWindow.setAlwaysOnTop(configRef.current.alwaysOnTop).catch(() => {});
-    await appWindow.setVisibleOnAllWorkspaces(false).catch(() => {});
   }, []);
 
-  const toggleLauncher = useCallback(async () => {
-    const appWindow = getCurrentWindow();
-    if (await appWindow.isVisible()) {
-      await appWindow.hide();
-      return "hidden";
-    }
-    await showLauncher();
-    return "shown";
-  }, [showLauncher]);
-
   useEffect(() => {
-    let cancelled = false;
+    let disposed = false;
+    let unlisten: (() => void) | null = null;
 
-    async function registerWakeShortcut() {
-      try {
-        if (await isRegistered(config.wakeShortcut)) {
-          await unregister(config.wakeShortcut);
-        }
-        await register(config.wakeShortcut, async (event) => {
-          if (event.state !== "Pressed") return;
-          const nextState = await toggleLauncher();
-          setStatus(`Wake shortcut triggered (${nextState}): ${event.shortcut}`);
-        });
-        const registered = await isRegistered(config.wakeShortcut);
-        if (!cancelled) {
-          setStatus(registered ? `Wake shortcut registered: ${config.wakeShortcut}` : `Wake shortcut not registered: ${config.wakeShortcut}`);
-        }
-      } catch (error) {
-        if (!cancelled) {
-          setStatus(`Wake shortcut unavailable: ${error instanceof Error ? error.message : String(error)}`);
-        }
-      }
-    }
+    invoke<string>("set_wake_shortcut", { shortcut: config.wakeShortcut })
+      .then((registered) => {
+        if (!disposed) setStatus(`Wake shortcut registered: ${registered}`);
+      })
+      .catch((error) => {
+        if (!disposed) setStatus(`Wake shortcut unavailable: ${error instanceof Error ? error.message : String(error)}`);
+      });
 
-    registerWakeShortcut();
+    listen<boolean>("pp://wake-shortcut", ({ payload: shown }) => {
+      if (shown) focusSearch();
+      setStatus(`Wake shortcut triggered (${shown ? "shown" : "hidden"}): ${configRef.current.wakeShortcut}`);
+    }).then((nextUnlisten) => {
+      unlisten = nextUnlisten;
+    });
 
     return () => {
-      cancelled = true;
-      unregister(config.wakeShortcut).catch(() => {});
+      disposed = true;
+      unlisten?.();
     };
-  }, [config.wakeShortcut, toggleLauncher]);
+  }, [config.wakeShortcut, focusSearch]);
 
   useEffect(() => {
-    const appWindow = getCurrentWindow();
-    appWindow.setAlwaysOnTop(config.alwaysOnTop).catch((error) => {
+    invoke("configure_launcher_behavior", { alwaysOnTop: config.alwaysOnTop }).catch((error) => {
       setStatus(`Always on top unavailable: ${error instanceof Error ? error.message : String(error)}`);
     });
   }, [config.alwaysOnTop]);
