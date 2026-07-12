@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import importlib.util
 import sys
+import tempfile
 from pathlib import Path
 
 
@@ -119,12 +120,25 @@ def test_ranking_prefers_alias_and_favorite(build):
     )
 
 
+def test_short_flag_controls_section_splitting(build):
+    with tempfile.TemporaryDirectory() as directory:
+        root = Path(directory)
+        prompts = root / "prompts"
+        prompts.mkdir()
+        (prompts / "short.md").write_text("---\nshort: true\n---\n\n## One\nFirst.\n\n## Two\nSecond.\n", encoding="utf-8")
+        (prompts / "normal.md").write_text("---\ntitle: Normal\n---\n\n## One\nFirst.\n\n## Two\nSecond.\n", encoding="utf-8")
+        index = build.build_index(root)
+        assert_equal(len(index["prompts"]), 3, "short flag split count")
+        assert_equal([p["title"] for p in index["prompts"]], ["Normal", "One", "Two"], "short flag titles")
+
+
 def main() -> int:
     build = load_build_module()
     tests = [
         test_frontmatter_parser,
         test_sample_index,
         test_ranking_prefers_alias_and_favorite,
+        test_short_flag_controls_section_splitting,
     ]
     for test in tests:
         test(build)
@@ -138,4 +152,3 @@ if __name__ == "__main__":
     except AssertionError as exc:
         print(f"FAIL: {exc}")
         raise SystemExit(1)
-

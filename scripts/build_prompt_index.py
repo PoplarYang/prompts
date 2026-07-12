@@ -87,6 +87,24 @@ def normalize_list(value) -> list[str]:
     return [str(value)] if str(value).strip() else []
 
 
+def split_prompt_sections(body: str) -> list[tuple[str, str]]:
+    sections: list[tuple[str, list[str]]] = []
+    current = None
+    in_fence = False
+    for line in body.splitlines():
+        if line.strip().startswith("```"):
+            in_fence = not in_fence
+        heading = re.match(r"^##\s+(.+?)\s*$", line) if not in_fence else None
+        if heading:
+            current = (heading.group(1), [])
+            sections.append(current)
+        elif current:
+            current[1].append(line)
+    if len(sections) < 2:
+        return [("", body)]
+    return [(title, "\n".join(lines).strip() + "\n") for title, lines in sections]
+
+
 def build_index(library_dir: Path) -> dict:
     manifest = load_manifest(library_dir)
     prompts_dir = library_dir / str(manifest.get("prompts_dir", "prompts"))
@@ -102,18 +120,20 @@ def build_index(library_dir: Path) -> dict:
         try:
             raw = path.read_text(encoding="utf-8")
             meta, body = parse_frontmatter(raw)
-            prompts.append(
-                {
-                    "id": rel_path,
-                    "title": str(meta.get("title") or title_from_path(path)),
-                    "description": str(meta.get("description") or ""),
-                    "tags": normalize_list(meta.get("tags")),
-                    "category": str(meta.get("category") or path.parent.name),
-                    "aliases": normalize_list(meta.get("aliases")),
-                    "path": rel_path,
-                    "body": body.rstrip() + "\n",
-                }
-            )
+            sections = split_prompt_sections(body) if meta.get("short") is True else [("", body)]
+            for index, (section_title, section_body) in enumerate(sections, start=1):
+                prompts.append(
+                    {
+                        "id": f"{rel_path}#{index}" if len(sections) > 1 else rel_path,
+                        "title": section_title or str(meta.get("title") or title_from_path(path)),
+                        "description": str(meta.get("description") or ""),
+                        "tags": normalize_list(meta.get("tags")),
+                        "category": str(meta.get("category") or path.parent.name),
+                        "aliases": normalize_list(meta.get("aliases")),
+                        "path": rel_path,
+                        "body": section_body.rstrip() + "\n",
+                    }
+                )
         except Exception as exc:  # pragma: no cover - keeps bad prompt files isolated.
             errors.append({"path": rel_path, "error": str(exc)})
 
@@ -148,4 +168,3 @@ def main(argv: list[str]) -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main(sys.argv))
-

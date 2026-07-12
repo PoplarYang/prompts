@@ -625,6 +625,42 @@ function parseFrontmatter(raw: string) {
   };
 }
 
+function splitPromptSections(body: string): Array<{ title: string; body: string }> {
+  const sections: Array<{ title: string; lines: string[] }> = [];
+  let current: { title: string; lines: string[] } | null = null;
+  let inFence = false;
+
+  for (const line of body.split("\n")) {
+    if (/^```/.test(line.trim())) inFence = !inFence;
+    const heading = !inFence ? line.match(/^##\s+(.+?)\s*$/) : null;
+    if (heading) {
+      current = { title: heading[1], lines: [] };
+      sections.push(current);
+    } else if (current) {
+      current.lines.push(line);
+    }
+  }
+
+  if (sections.length < 2) return [{ title: "", body }];
+  return sections.map(({ title, lines }) => ({ title, body: lines.join("\n").trim() + "\n" }));
+}
+
+function promptEntries(path: string, meta: Record<string, unknown>, body: string, source: "github" | "local", promptsDir: string): Prompt[] {
+  const sections = meta.short === true ? splitPromptSections(body) : [{ title: "", body }];
+  const baseTitle = String(meta.title || titleFromPath(path));
+  return sections.map((section, index) => ({
+    id: sections.length > 1 ? `${source}:${path}#${index + 1}` : `${source}:${path}`,
+    title: section.title || baseTitle,
+    description: String(meta.description || ""),
+    tags: normalizeList(meta.tags),
+    category: String(meta.category || categoryFromPath(path, promptsDir)),
+    aliases: normalizeList(meta.aliases),
+    path,
+    body: section.body.trimEnd() + "\n",
+    source,
+  }));
+}
+
 function normalizeList(value: unknown): string[] {
   if (Array.isArray(value)) return value.map(String).filter(Boolean);
   if (value == null || value === "") return [];
@@ -707,24 +743,15 @@ async function syncPrompts(config: AppConfig): Promise<PromptIndex> {
     manifest = {};
   }
 
-  const prompts = await Promise.all(
+  const promptGroups = await Promise.all(
     paths.map(async (path) => {
       const raw = await fetchRawFile(repo, config.branch, path);
       const { meta, body } = parseFrontmatter(raw);
       const typedMeta = meta as Record<string, unknown>;
-      return {
-        id: path,
-        title: String(typedMeta.title || titleFromPath(path)),
-        description: String(typedMeta.description || ""),
-        tags: normalizeList(typedMeta.tags),
-        category: String(typedMeta.category || categoryFromPath(path, promptRoot)),
-        aliases: normalizeList(typedMeta.aliases),
-        path,
-        body: body.trimEnd() + "\n",
-        source: "github" as const,
-      };
+      return promptEntries(path, typedMeta, body, "github", promptRoot);
     }),
   );
+  const prompts = promptGroups.flat();
 
   return {
     library: {
@@ -755,20 +782,10 @@ async function loadLocalPrompts(config: AppConfig): Promise<PromptIndex> {
   if (!localFiles.files.length) throw new Error(`No Markdown prompts found under ${promptRoot}/`);
 
   const manifest = localFiles.manifest ? parseYaml(localFiles.manifest) : {};
-  const prompts = localFiles.files.map(({ path, raw }) => {
+  const prompts = localFiles.files.flatMap(({ path, raw }) => {
     const { meta, body } = parseFrontmatter(raw);
     const typedMeta = meta as Record<string, unknown>;
-    return {
-      id: `local:${path}`,
-      title: String(typedMeta.title || titleFromPath(path)),
-      description: String(typedMeta.description || ""),
-      tags: normalizeList(typedMeta.tags),
-      category: String(typedMeta.category || categoryFromPath(path, promptRoot)),
-      aliases: normalizeList(typedMeta.aliases),
-      path,
-      body: body.trimEnd() + "\n",
-      source: "local" as const,
-    };
+    return promptEntries(path, typedMeta, body, "local", promptRoot);
   });
 
   return {

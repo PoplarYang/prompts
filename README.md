@@ -30,6 +30,7 @@ https://github.com/PoplarYang/prompts
 - Desktop language setting for system, Chinese, and English.
 - Desktop copy success feedback with a short visual affordance.
 - Human-readable Markdown + YAML prompt repository format.
+- Set `short: true` in frontmatter to split a short-prompt file into independent `##` prompt entries; without it, the file remains one prompt.
 
 ## Run Locally
 

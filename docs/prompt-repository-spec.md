@@ -53,7 +53,7 @@ Fields:
 
 ## Prompt File Format
 
-Each prompt is a Markdown file with optional YAML frontmatter.
+Each prompt is normally a Markdown file with optional YAML frontmatter. A file is split into multiple prompts only when its frontmatter contains `short: true` and it has two or more top-level `##` sections. Each section title becomes the prompt title and the section body becomes the copied content. Without `short: true`, the entire file remains one prompt.
 
 ````md
 ---
@@ -90,6 +90,7 @@ aliases: [cr, review code]
 | `aliases` | No | Search aliases or abbreviations. |
 | `language` | No | Main language of the prompt content. |
 | `updated_at` | No | User-maintained update date. |
+| `short` | No | Set to `true` to split a short-prompt file by top-level `##` sections. |
 
 ## Prompt ID
 
@@ -151,4 +152,3 @@ variables:
 ```
 
 Variable support should be deferred until after the first version.
-
