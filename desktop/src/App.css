@@ -212,6 +212,7 @@ textarea {
 }
 
 .search-wrap {
+  position: relative;
   height: 48px;
   display: grid;
   grid-template-columns: auto 1fr;
@@ -241,6 +242,10 @@ textarea {
   outline: 0;
   color: var(--text);
   background: transparent;
+}
+
+#searchInput {
+  padding-right: 30px;
 }
 
 .content {
@@ -888,6 +893,10 @@ kbd {
 }
 
 .search-clear {
+  position: absolute;
+  top: 50%;
+  right: 10px;
+  transform: translateY(-50%);
   width: 22px;
   height: 22px;
   flex: 0 0 22px;
@@ -897,6 +906,10 @@ kbd {
   background: var(--panel-strong);
   cursor: pointer;
   line-height: 18px;
+}
+
+.search-clear:hover {
+  transform: translateY(-50%);
 }
 
 .search-clear:hover {

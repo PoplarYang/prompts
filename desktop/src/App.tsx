@@ -937,6 +937,13 @@ function App() {
   }, [promptIndex.prompts, selectedPrompt]);
 
   useEffect(() => {
+    if (!query.trim() || !selectedPrompt?.short || !markdownRef.current) return;
+    const target = [...markdownRef.current.querySelectorAll<HTMLElement>(".prompt-block")]
+      .find((element) => element.dataset.promptId === selectedPrompt.id);
+    target?.scrollIntoView({ block: "start" });
+  }, [query, selectedPrompt?.id]);
+
+  useEffect(() => {
     localStorage.setItem(configKey, JSON.stringify(config));
     configRef.current = config;
   }, [config]);
@@ -1385,8 +1392,10 @@ function App() {
                     .filter((group) => group.some((prompt) => section.prompts.some((item) => item.id === prompt.id)))
                     .map((group) => {
                     const prompt = group[0];
+                    const displayTitle = prompt.collectionTitle || prompt.title;
+                    const statePrompt = group.find((item) => item.id === selectedPromptId) || prompt;
                     const isSelected = group.some((item) => item.id === selectedPromptId);
-                    const promptState = getPromptState(localState, prompt.id);
+                    const promptState = getPromptState(localState, statePrompt.id);
                     return (
                       <button
                         key={`${section.id}-${prompt.source}-${prompt.path}`}
@@ -1402,7 +1411,7 @@ function App() {
                             <span className={`source-icon is-${prompt.source || "bundled"}`} title={sourceLabel(prompt.source, t)}>
                               {sourceIcon(prompt.source)}
                             </span>
-                            {highlightText(prompt.title, search)}
+                            {highlightText(displayTitle, search)}
                             {group.length > 1 && <span className="collection-count"> · {group.length}</span>}
                           </span>
                           <span className="result-description">{highlightText(prompt.description, search)}</span>
@@ -1482,7 +1491,7 @@ function App() {
               className={`markdown markdown-collection${selectedCollection.length > 1 ? " has-sections" : ""}`}
             >
               {selectedCollection.map((prompt) => (
-                <section className="prompt-block" key={prompt.id}>
+                <section className="prompt-block" data-prompt-id={prompt.id} key={prompt.id}>
                   {selectedCollection.length > 1 && (
                     <div className="prompt-block-head">
                       <h2>{highlightText(prompt.title, search)}</h2>
