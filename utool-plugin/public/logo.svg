@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-label="pp app icon">
+  <rect width="1024" height="1024" rx="224" fill="#ffffff"/>
+  <rect x="30" y="30" width="964" height="964" rx="204" fill="none" stroke="#dce3ed" stroke-width="22"/>
+  <g fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="58">
+    <path d="M250 676V522" stroke="#ea4335"/>
+    <path d="M250 522V394C250 298 336 250 414 274C488 297 524 375 492 444" stroke="#1a73e8"/>
+    <path d="M492 444C450 518 340 526 284 466C262 442 250 418 250 394" stroke="#fbbc04"/>
+    <path d="M592 676V522" stroke="#1a73e8"/>
+    <path d="M592 522V394C592 298 678 250 756 274C836 298 875 385 838 459C798 537 679 539 624 471C602 443 592 418 592 394" stroke="#16a765"/>
+  </g>
+</svg>

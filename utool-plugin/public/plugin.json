@@ -1,0 +1,24 @@
+{
+  "name": "pp-prompts",
+  "pluginName": "pp 提示词",
+  "version": "0.1.0",
+  "description": "快速搜索并复制个人提示词",
+  "author": "PoplarYang",
+  "homepage": "https://github.com/PoplarYang/prompts",
+  "main": "index.html",
+  "logo": "pp-logo.png",
+  "preload": "preload.js",
+  "platform": ["darwin", "win32", "linux"],
+  "pluginSetting": {
+    "single": true,
+    "height": 620
+  },
+  "features": [
+    {
+      "code": "pp-prompts",
+      "icon": "pp-logo.png",
+      "explain": "快速搜索并复制提示词",
+      "cmds": ["pp 提示词", "提示词库", "prompts"]
+    }
+  ]
+}
